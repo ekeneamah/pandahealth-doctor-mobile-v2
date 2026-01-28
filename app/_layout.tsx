@@ -8,6 +8,7 @@ import { enableFreeze } from 'react-native-screens';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuthStore } from '@/src/store/auth.store';
+import fcmService from '@/src/services/fcm.service';
 
 // Disable screen freezing to fix IndexOutOfBoundsException
 enableFreeze(false);
@@ -41,7 +42,19 @@ function useProtectedRoute() {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const { isHydrated } = useAuthStore();
+  const { isHydrated, isAuthenticated } = useAuthStore();
+
+  // Initialize FCM when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      fcmService.initialize();
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      fcmService.cleanup();
+    };
+  }, [isAuthenticated]);
 
   // Show loading screen while auth state is hydrating
   if (!isHydrated) {

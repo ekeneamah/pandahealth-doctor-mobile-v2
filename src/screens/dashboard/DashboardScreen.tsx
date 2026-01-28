@@ -1,6 +1,8 @@
 import { Badge, Card, CardContent, Spinner } from '@/src/components/ui';
 import { borderRadius, colors, fontSize, shadows, spacing } from '@/src/constants/theme';
+import { getErrorMessage } from '@/src/lib/api-client';
 import { formatRelativeTime, getPriorityColor, getSLAColor, getTimeOfDay } from '@/src/lib/utils';
+import { caseService } from '@/src/services/case.service';
 import { useAuthStore } from '@/src/store/auth.store';
 import type { Case, DoctorDashboardStats, SLAMetrics } from '@/src/types';
 import { getSLAStatus } from '@/src/types';
@@ -8,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+    Alert,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -45,60 +48,32 @@ export default function DashboardScreen() {
 
   const loadDashboardData = useCallback(async () => {
     try {
-      // Mock data - replace with actual API calls
-      setStats({
-        pendingCases: 12,
-        inReviewCases: 3,
-        completedToday: 8,
-        completedThisWeek: 45,
-        averageResponseTime: 18,
-        slaComplianceRate: 94,
-        totalCasesHandled: 520,
-      });
-
-      setSlaMetrics({
-        totalCases: 50,
-        withinSLA: 47,
-        atRisk: 2,
-        breached: 1,
-        averageResponseTime: 18,
-        targetResponseTime: 30,
-      });
-
-      setRecentCases([
-        {
-          id: '1',
-          caseNumber: 'CS-2026-001234',
-          patientName: 'John Doe',
-          patientAge: 35,
-          patientGender: 'Male',
-          patientPhone: '+234 800 123 4567',
-          status: 'AwaitingDoctor',
-          priority: 'High',
-          pmvId: 'pmv-1',
-          pmvName: 'Adewale Pharmacy',
-          symptoms: 'Severe headache, fever',
-          createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          caseNumber: 'CS-2026-001235',
-          patientName: 'Sarah Johnson',
-          patientAge: 28,
-          patientGender: 'Female',
-          patientPhone: '+234 800 234 5678',
-          status: 'AwaitingDoctor',
-          priority: 'Urgent',
-          pmvId: 'pmv-2',
-          pmvName: 'HealthPlus',
-          symptoms: 'Chest pain, breathing difficulty',
-          createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
+      console.log('[DashboardScreen] Loading dashboard data');
+      
+      // Load stats and SLA metrics in parallel
+      const [statsResponse, slaResponse, pendingResponse] = await Promise.all([
+        caseService.getStats(),
+        caseService.getSLAMetrics(),
+        caseService.getPendingCases(1, 5)
       ]);
+
+      if (statsResponse.success && statsResponse.data) {
+        console.log('[DashboardScreen] Stats loaded');
+        setStats(statsResponse.data);
+      }
+
+      if (slaResponse.success && slaResponse.data) {
+        console.log('[DashboardScreen] SLA metrics loaded');
+        setSlaMetrics(slaResponse.data);
+      }
+
+      if (pendingResponse.success && pendingResponse.data) {
+        console.log('[DashboardScreen] Recent cases loaded:', pendingResponse.data.data.length);
+        setRecentCases(pendingResponse.data.data.slice(0, 3));
+      }
     } catch (error) {
-      console.error('Failed to load dashboard:', error);
+      console.error('[DashboardScreen] Failed to load dashboard:', error);
+      Alert.alert('Error', getErrorMessage(error));
     } finally {
       setIsLoading(false);
       setRefreshing(false);

@@ -1,12 +1,15 @@
 import { Badge, Spinner } from '@/src/components/ui';
 import { borderRadius, colors, fontSize, shadows, spacing } from '@/src/constants/theme';
+import { getErrorMessage } from '@/src/lib/api-client';
 import { getPriorityColor, getSLAColor, getWaitTime } from '@/src/lib/utils';
+import { caseService } from '@/src/services/case.service';
 import type { Case, CasePriority } from '@/src/types';
 import { getSLAStatus } from '@/src/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+    Alert,
     FlatList,
     RefreshControl,
     StyleSheet,
@@ -25,115 +28,73 @@ export default function CasesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPriority, setSelectedPriority] = useState('All');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
-  const loadCases = useCallback(async () => {
+  const loadCases = useCallback(async (pageNum: number = 1, append: boolean = false) => {
     try {
-      // Mock data - replace with actual API
-      const mockCases: Case[] = [
-        {
-          id: '1',
-          caseNumber: 'CS-2026-001234',
-          patientName: 'John Doe',
-          patientAge: 35,
-          patientGender: 'Male',
-          patientPhone: '+234 800 123 4567',
-          status: 'AwaitingDoctor',
-          priority: 'Urgent',
-          pmvId: 'pmv-1',
-          pmvName: 'Adewale Pharmacy',
-          symptoms: 'Chest pain, shortness of breath, dizziness',
-          createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          caseNumber: 'CS-2026-001235',
-          patientName: 'Sarah Johnson',
-          patientAge: 28,
-          patientGender: 'Female',
-          patientPhone: '+234 800 234 5678',
-          status: 'AwaitingDoctor',
-          priority: 'High',
-          pmvId: 'pmv-2',
-          pmvName: 'HealthPlus Pharmacy',
-          symptoms: 'Severe headache, fever, body aches lasting 3 days',
-          createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: '3',
-          caseNumber: 'CS-2026-001236',
-          patientName: 'Michael Obi',
-          patientAge: 45,
-          patientGender: 'Male',
-          patientPhone: '+234 800 345 6789',
-          status: 'AwaitingDoctor',
-          priority: 'Medium',
-          pmvId: 'pmv-3',
-          pmvName: 'Care Pharmacy',
-          symptoms: 'Persistent cough, sore throat, runny nose',
-          createdAt: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: '4',
-          caseNumber: 'CS-2026-001237',
-          patientName: 'Grace Emeka',
-          patientAge: 32,
-          patientGender: 'Female',
-          patientPhone: '+234 800 456 7890',
-          status: 'AwaitingDoctor',
-          priority: 'Low',
-          pmvId: 'pmv-1',
-          pmvName: 'Adewale Pharmacy',
-          symptoms: 'Mild stomach discomfort, occasional nausea',
-          createdAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ];
+      console.log('[CasesScreen] Loading cases, page:', pageNum);
+      
+      const priority = selectedPriority === 'All' ? undefined : selectedPriority;
+      const response = await caseService.getPendingCases(pageNum, 20, priority);
+      
+      console.log('[CasesScreen] Response:', {
+        success: response.success,
+        total: response.data?.total,
+        page: response.data?.page,
+        count: response.data?.data?.length
+      });
 
-      // Sort by priority
-      const priorityOrder: Record<CasePriority, number> = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
-      mockCases.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
-
-      setCases(mockCases);
-      setFilteredCases(mockCases);
+      if (response.success && response.data) {
+        const newCases = response.data.data || [];
+        setCases(append ? [...cases, ...newCases] : newCases);
+        setFilteredCases(append ? [...cases, ...newCases] : newCases);
+        setHasMore(response.data.page < response.data.totalPages);
+      } else {
+        Alert.alert('Error', response.message || 'Failed to load cases');
+      }
     } catch (error) {
-      console.error('Failed to load cases:', error);
+      console.error('[CasesScreen] Failed to load cases:', error);
+      Alert.alert('Error', getErrorMessage(error));
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [selectedPriority]);
 
   useEffect(() => {
-    loadCases();
-  }, [loadCases]);
+    loadCases(1, false);
+  }, [selectedPriority]);
 
   useEffect(() => {
     let filtered = cases;
-
-    if (selectedPriority !== 'All') {
-      filtered = filtered.filter((c) => c.priority === selectedPriority);
-    }
 
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (c) =>
-          c.patientName.toLowerCase().includes(search) ||
+          c.patientName?.toLowerCase().includes(search) ||
           c.caseNumber.toLowerCase().includes(search) ||
-          c.symptoms.toLowerCase().includes(search)
+          c.symptoms?.toLowerCase().includes(search)
       );
     }
 
     setFilteredCases(filtered);
-  }, [searchTerm, selectedPriority, cases]);
+  }, [searchTerm, cases]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadCases();
+    setPage(1);
+    loadCases(1, false);
   }, [loadCases]);
+
+  const loadMore = useCallback(() => {
+    if (!isLoading && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadCases(nextPage, true);
+    }
+  }, [isLoading, hasMore, page, loadCases]);
 
   const renderCaseItem = ({ item }: { item: Case }) => {
     const priorityColors = getPriorityColor(item.priority);
@@ -247,6 +208,8 @@ export default function CasesScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="clipboard-outline" size={48} color={colors.gray[300]} />
@@ -255,6 +218,13 @@ export default function CasesScreen() {
               Pull down to refresh
             </Text>
           </View>
+        }
+        ListFooterComponent={
+          hasMore && !isLoading && filteredCases.length > 0 ? (
+            <View style={{ padding: spacing.lg }}>
+              <Spinner size="sm" />
+            </View>
+          ) : null
         }
       />
     </View>

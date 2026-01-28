@@ -1,3 +1,3 @@
-import DashboardScreen from '@/src/screens/dashboard/DashboardScreen';
+import NotificationsScreen from '@/src/screens/notifications/NotificationsScreen';
 
-export default DashboardScreen;
+export default NotificationsScreen;

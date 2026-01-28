@@ -4,7 +4,6 @@ import type {
     Case,
     CaseStatus,
     DoctorDashboardStats,
-    PaginatedResponse,
     SLAMetrics,
     SubmitDiagnosisRequest,
 } from '@/src/types';
@@ -17,24 +16,32 @@ export interface GetCasesParams {
   searchTerm?: string;
 }
 
+export interface PaginatedCaseResponse {
+  data: Case[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export const caseService = {
-  async getPendingCases(page: number = 1, pageSize: number = 10): Promise<PaginatedResponse<Case>> {
+  async getPendingCases(page: number = 1, pageSize: number = 10, priority?: string): Promise<ApiResponse<PaginatedCaseResponse>> {
     const params = new URLSearchParams({
       page: page.toString(),
       pageSize: pageSize.toString(),
-      status: 'AwaitingDoctor',
     });
-    const response = await apiClient.get<PaginatedResponse<Case>>(`/doctor/cases/pending?${params}`);
+    if (priority) params.append('priority', priority);
+    const response = await apiClient.get<ApiResponse<PaginatedCaseResponse>>(`/doctor/cases/pending?${params}`);
     return response.data;
   },
 
-  async getMyCases(page: number = 1, pageSize: number = 10, status?: CaseStatus): Promise<PaginatedResponse<Case>> {
+  async getMyCases(page: number = 1, pageSize: number = 10, status?: CaseStatus): Promise<ApiResponse<PaginatedCaseResponse>> {
     const params = new URLSearchParams({
       page: page.toString(),
       pageSize: pageSize.toString(),
     });
     if (status) params.append('status', status);
-    const response = await apiClient.get<PaginatedResponse<Case>>(`/doctor/cases/my-cases?${params}`);
+    const response = await apiClient.get<ApiResponse<PaginatedCaseResponse>>(`/doctor/cases/my-cases?${params}`);
     return response.data;
   },
 
@@ -48,9 +55,9 @@ export const caseService = {
     return response.data;
   },
 
-  async submitDiagnosis(request: SubmitDiagnosisRequest): Promise<ApiResponse<Case>> {
+  async submitDiagnosis(caseId: string, request: SubmitDiagnosisRequest): Promise<ApiResponse<Case>> {
     const response = await apiClient.post<ApiResponse<Case>>(
-      `/doctor/cases/${request.caseId}/diagnosis`,
+      `/doctor/cases/${caseId}/diagnosis`,
       request
     );
     return response.data;
@@ -66,13 +73,12 @@ export const caseService = {
     return response.data;
   },
 
-  async getCompletedCases(page: number = 1, pageSize: number = 10): Promise<PaginatedResponse<Case>> {
+  async getCompletedCases(page: number = 1, pageSize: number = 10): Promise<ApiResponse<PaginatedCaseResponse>> {
     const params = new URLSearchParams({
       page: page.toString(),
       pageSize: pageSize.toString(),
-      status: 'Completed',
     });
-    const response = await apiClient.get<PaginatedResponse<Case>>(`/doctor/cases/history?${params}`);
+    const response = await apiClient.get<ApiResponse<PaginatedCaseResponse>>(`/doctor/cases/history?${params}`);
     return response.data;
   },
 };

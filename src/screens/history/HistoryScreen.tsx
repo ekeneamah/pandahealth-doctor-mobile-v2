@@ -1,11 +1,14 @@
 import { Badge, Spinner } from '@/src/components/ui';
 import { borderRadius, colors, fontSize, shadows, spacing } from '@/src/constants/theme';
+import { getErrorMessage } from '@/src/lib/api-client';
 import { formatDate, formatDuration, getPriorityColor } from '@/src/lib/utils';
+import { caseService } from '@/src/services/case.service';
 import type { Case } from '@/src/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+    Alert,
     FlatList,
     RefreshControl,
     StyleSheet,
@@ -20,88 +23,26 @@ export default function HistoryScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
-  const loadHistory = useCallback(async () => {
+  const loadHistory = useCallback(async (pageNum: number = 1, append: boolean = false) => {
     try {
-      // Mock data - replace with API
-      const mockCases: Case[] = [
-        {
-          id: '100',
-          caseNumber: 'CS-2026-001200',
-          patientName: 'Chioma Nwankwo',
-          patientAge: 34,
-          patientGender: 'Female',
-          patientPhone: '+234 800 999 8888',
-          status: 'Completed',
-          priority: 'Medium',
-          pmvId: 'pmv-1',
-          pmvName: 'Adewale Pharmacy',
-          symptoms: 'Urinary tract infection symptoms',
-          diagnosis: 'Acute cystitis',
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          completedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 25 * 60 * 1000).toISOString(),
-          responseTime: 25,
-        },
-        {
-          id: '101',
-          caseNumber: 'CS-2026-001195',
-          patientName: 'Oluwaseun Bakare',
-          patientAge: 29,
-          patientGender: 'Male',
-          patientPhone: '+234 800 777 6666',
-          status: 'Completed',
-          priority: 'High',
-          pmvId: 'pmv-2',
-          pmvName: 'HealthPlus Pharmacy',
-          symptoms: 'Severe migraine with visual disturbances',
-          diagnosis: 'Migraine with aura',
-          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          completedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 18 * 60 * 1000).toISOString(),
-          responseTime: 18,
-        },
-        {
-          id: '102',
-          caseNumber: 'CS-2026-001190',
-          patientName: 'Aisha Mohammed',
-          patientAge: 42,
-          patientGender: 'Female',
-          patientPhone: '+234 800 555 4444',
-          status: 'Completed',
-          priority: 'Low',
-          pmvId: 'pmv-3',
-          pmvName: 'Care Pharmacy',
-          symptoms: 'Seasonal allergies, itchy eyes',
-          diagnosis: 'Allergic conjunctivitis',
-          createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-          completedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 + 15 * 60 * 1000).toISOString(),
-          responseTime: 15,
-        },
-        {
-          id: '103',
-          caseNumber: 'CS-2026-001185',
-          patientName: 'Emmanuel Okonkwo',
-          patientAge: 55,
-          patientGender: 'Male',
-          patientPhone: '+234 800 333 2222',
-          status: 'Completed',
-          priority: 'Urgent',
-          pmvId: 'pmv-1',
-          pmvName: 'Adewale Pharmacy',
-          symptoms: 'Suspected diabetes symptoms',
-          diagnosis: 'Type 2 Diabetes Mellitus',
-          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          completedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 + 12 * 60 * 1000).toISOString(),
-          responseTime: 12,
-        },
-      ];
-
-      setCases(mockCases);
+      console.log('[HistoryScreen] Loading history, page:', pageNum);
+      
+      const response = await caseService.getCompletedCases(pageNum, 20);
+      
+      if (response.success && response.data) {
+        console.log('[HistoryScreen] History loaded:', response.data.data.length);
+        const newCases = response.data.data || [];
+        setCases(append ? [...cases, ...newCases] : newCases);
+        setHasMore(response.data.page < response.data.totalPages);
+      } else {
+        Alert.alert('Error', response.message || 'Failed to load case history');
+      }
     } catch (error) {
-      console.error('Failed to load history:', error);
+      console.error('[HistoryScreen] Failed to load history:', error);
+      Alert.alert('Error', getErrorMessage(error));
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -114,8 +55,17 @@ export default function HistoryScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadHistory();
+    setPage(1);
+    loadHistory(1, false);
   }, [loadHistory]);
+
+  const loadMore = useCallback(() => {
+    if (!isLoading && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadHistory(nextPage, true);
+    }
+  }, [isLoading, hasMore, page, loadHistory]);
 
   const filteredCases = searchTerm
     ? cases.filter(
@@ -205,6 +155,8 @@ export default function HistoryScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="time-outline" size={48} color={colors.gray[300]} />
@@ -213,6 +165,13 @@ export default function HistoryScreen() {
               Your case history will appear here
             </Text>
           </View>
+        }
+        ListFooterComponent={
+          hasMore && !isLoading && filteredCases.length > 0 ? (
+            <View style={{ padding: spacing.lg }}>
+              <Spinner size="sm" />
+            </View>
+          ) : null
         }
       />
     </View>

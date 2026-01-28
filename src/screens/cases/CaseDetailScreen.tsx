@@ -1,6 +1,8 @@
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Spinner } from '@/src/components/ui';
 import { borderRadius, colors, fontSize, spacing } from '@/src/constants/theme';
+import { getErrorMessage } from '@/src/lib/api-client';
 import { formatDateTime, getPriorityColor, getSLAColor } from '@/src/lib/utils';
+import { caseService } from '@/src/services/case.service';
 import type { Case, Medication } from '@/src/types';
 import { classifyDrug, getSLAStatus } from '@/src/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,45 +51,20 @@ export default function CaseDetailScreen() {
 
   const loadCaseDetails = useCallback(async () => {
     try {
-      // Mock data - replace with API call
-      const mockCase: Case = {
-        id: id!,
-        caseNumber: 'CS-2026-001234',
-        patientName: 'John Doe',
-        patientAge: 35,
-        patientGender: 'Male',
-        patientPhone: '+234 800 123 4567',
-        patientEmail: 'john.doe@email.com',
-        status: 'AwaitingDoctor',
-        priority: 'High',
-        pmvId: 'pmv-1',
-        pmvName: 'Adewale Johnson',
-        pmvBusinessName: 'Adewale Pharmacy & Clinic',
-        symptoms: 'Severe headache, fever, body aches lasting 3 days',
-        symptomsDetails: [
-          'Headache started 3 days ago',
-          'Fever measured at 38.5°C',
-          'Body aches especially in joints',
-          'Mild sore throat',
-          'Loss of appetite',
-        ],
-        vitals: {
-          bloodPressure: '120/80',
-          heartRate: 88,
-          temperature: 38.5,
-          respiratoryRate: 18,
-          oxygenSaturation: 98,
-          weight: 75,
-          height: 175,
-          notes: 'Patient appears fatigued but alert',
-        },
-        pmvNotes: 'Patient has been taking Paracetamol with minimal relief. No known allergies.',
-        createdAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setCaseData(mockCase);
+      console.log('[CaseDetailScreen] Loading case:', id);
+      const response = await caseService.getById(id!);
+      
+      if (response.success && response.data) {
+        console.log('[CaseDetailScreen] Case loaded:', response.data.caseNumber);
+        setCaseData(response.data);
+      } else {
+        Alert.alert('Error', response.message || 'Failed to load case details');
+        router.back();
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to load case details');
+      console.error('[CaseDetailScreen] Error loading case:', error);
+      Alert.alert('Error', getErrorMessage(error));
+      router.back();
     } finally {
       setIsLoading(false);
     }
@@ -120,16 +97,46 @@ export default function CaseDetailScreen() {
       Alert.alert('Error', 'Please provide advice for the patient');
       return;
     }
+    if (medications.length === 0) {
+      Alert.alert('Error', 'Please add at least one medication');
+      return;
+    }
+
+    // Validate all medications are complete
+    const incompleteMeds = medications.filter(
+      m => !m.name?.trim() || !m.dosage?.trim() || !m.frequency?.trim() || !m.duration?.trim()
+    );
+    if (incompleteMeds.length > 0) {
+      Alert.alert('Error', 'Please complete all medication fields');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      // API call here
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      Alert.alert('Success', 'Diagnosis submitted successfully', [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
+      console.log('[CaseDetailScreen] Submitting diagnosis for case:', id);
+      
+      const response = await caseService.submitDiagnosis(id!, {
+        caseId: id!,
+        diagnosis: diagnosis.trim(),
+        advice: advice.trim(),
+        medications: medications.map(m => ({
+          ...m,
+          ...classifyDrug(m.name!)
+        })) as Medication[],
+        followUpRequired: false,
+        referralRequired: false,
+      });
+
+      if (response.success) {
+        Alert.alert('Success', 'Diagnosis submitted successfully', [
+          { text: 'OK', onPress: () => router.back() }
+        ]);
+      } else {
+        Alert.alert('Error', response.message || 'Failed to submit diagnosis');
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to submit diagnosis');
+      console.error('[CaseDetailScreen] Error submitting diagnosis:', error);
+      Alert.alert('Error', getErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }

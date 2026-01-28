@@ -1,12 +1,37 @@
 import { colors } from '@/src/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import notificationService from '@/src/services/notification.service';
 
 export default function TabLayout() {
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    // Load unread count
+    loadUnreadCount();
+
+    // Poll every 30 seconds
+    const interval = setInterval(() => {
+      loadUnreadCount();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadUnreadCount = async () => {
+    try {
+      const data = await notificationService.getUnreadCount();
+      setUnreadCount(data.total);
+    } catch (error) {
+      console.error('Error loading unread count:', error);
+    }
+  };
+
   return (
     <Tabs
-      initialRouteName="cases"
+      initialRouteName="index"
       screenOptions={{
         freezeOnBlur: false,
         tabBarActiveTintColor: colors.primary[600],
@@ -26,9 +51,18 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
+          title: 'Notifications',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="grid-outline" size={size} color={color} />
+            <View>
+              <Ionicons name="notifications-outline" size={size} color={color} />
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />
@@ -62,3 +96,24 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  badge: {
+    position: 'absolute',
+    right: -10,
+    top: -4,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+});
+
