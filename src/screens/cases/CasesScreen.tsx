@@ -18,10 +18,13 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { GestureDetector } from 'react-native-gesture-handler';
+import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 
 const PRIORITY_OPTIONS = ['All', 'Urgent', 'High', 'Medium', 'Low'];
 
 export default function CasesScreen() {
+  const swipeGesture = useSwipeNavigation();
   const [cases, setCases] = useState<Case[]>([]);
   const [filteredCases, setFilteredCases] = useState<Case[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -149,9 +152,10 @@ export default function CasesScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
+    <GestureDetector gesture={swipeGesture}>
+      <View style={styles.container}>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
           <Ionicons name="search-outline" size={20} color={colors.gray[400]} />
           <TextInput
@@ -228,6 +232,7 @@ export default function CasesScreen() {
         }
       />
     </View>
+    </GestureDetector>
   );
 }
 
@@ -240,18 +245,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.gray[50],
   },
   searchContainer: {
     padding: spacing.lg,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.md,
     backgroundColor: colors.white,
+    ...shadows.sm,
   },
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.gray[100],
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.md,
+    backgroundColor: colors.gray[50],
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: borderRadius.xl,
+    paddingHorizontal: spacing.lg,
     gap: spacing.sm,
   },
   searchInput: {
@@ -271,18 +280,22 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   filterChip: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
     borderRadius: borderRadius.full,
     backgroundColor: colors.gray[100],
     marginRight: spacing.sm,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   filterChipActive: {
     backgroundColor: colors.primary[600],
+    borderColor: colors.primary[700],
+    ...shadows.sm,
   },
   filterChipText: {
     fontSize: fontSize.sm,
-    fontWeight: '500',
+    fontWeight: '600',
     color: colors.gray[600],
   },
   filterChipTextActive: {
@@ -294,15 +307,17 @@ const styles = StyleSheet.create({
   },
   caseCard: {
     backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
     marginBottom: spacing.md,
-    ...shadows.sm,
+    ...shadows.md,
+    borderWidth: 1,
+    borderColor: colors.gray[100],
   },
   caseHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   caseInfo: {
     flex: 1,
@@ -311,11 +326,14 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.gray[400],
     marginBottom: spacing.xs,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   patientName: {
-    fontSize: fontSize.base,
-    fontWeight: '600',
+    fontSize: fontSize.lg,
+    fontWeight: '700',
     color: colors.gray[900],
+    marginBottom: spacing.xs,
   },
   patientDetails: {
     fontSize: fontSize.sm,
@@ -324,43 +342,44 @@ const styles = StyleSheet.create({
   },
   badgeContainer: {
     alignItems: 'flex-end',
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   symptoms: {
     fontSize: fontSize.sm,
     color: colors.gray[600],
     marginBottom: spacing.md,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   caseFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: spacing.sm,
+    paddingTop: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.gray[100],
   },
   pmvInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   pmvName: {
     fontSize: fontSize.sm,
     color: colors.gray[500],
+    fontWeight: '500',
   },
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: spacing['4xl'],
   },
   emptyText: {
-    fontSize: fontSize.lg,
-    fontWeight: '600',
+    fontSize: fontSize.xl,
+    fontWeight: '700',
     color: colors.gray[500],
     marginTop: spacing.lg,
   },
   emptySubtext: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.base,
     color: colors.gray[400],
     marginTop: spacing.sm,
   },

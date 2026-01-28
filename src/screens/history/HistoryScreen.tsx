@@ -17,8 +17,11 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { GestureDetector } from 'react-native-gesture-handler';
+import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 
 export default function HistoryScreen() {
+  const swipeGesture = useSwipeNavigation();
   const [cases, setCases] = useState<Case[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -125,9 +128,10 @@ export default function HistoryScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
+    <GestureDetector gesture={swipeGesture}>
+      <View style={styles.container}>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
           <Ionicons name="search-outline" size={20} color={colors.gray[400]} />
           <TextInput
@@ -175,6 +179,7 @@ export default function HistoryScreen() {
         }
       />
     </View>
+    </GestureDetector>
   );
 }
 

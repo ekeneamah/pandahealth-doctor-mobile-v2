@@ -18,6 +18,7 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Image,
 } from 'react-native';
 import { z } from 'zod';
 
@@ -109,10 +110,11 @@ export default function LoginScreen() {
       >
         {/* Logo & Branding */}
         <View style={styles.brandContainer}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="medical" size={40} color={colors.white} />
-          </View>
-          <Text style={styles.brandTitle}>PandaHealth</Text>
+          <Image 
+            source={require('@/assets/images/pandahealth-doctor-logo.png')} 
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.brandSubtitle}>Doctor Portal</Text>
         </View>
 
@@ -201,19 +203,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing['4xl'],
     paddingBottom: spacing['3xl'],
   },
-  logoContainer: {
-    width: 80,
+  logo: {
+    width: 200,
     height: 80,
-    backgroundColor: colors.primary[600],
-    borderRadius: borderRadius.xl,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  brandTitle: {
-    fontSize: fontSize['2xl'],
-    fontWeight: '700',
-    color: colors.gray[900],
+    marginBottom: spacing.md,
   },
   brandSubtitle: {
     fontSize: fontSize.base,

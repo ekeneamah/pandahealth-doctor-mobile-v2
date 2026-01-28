@@ -4,7 +4,7 @@
     "slug": "panda-doctor",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/pandahealth-doctor-logo.png",
     "scheme": "pandadoctor",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -32,11 +32,12 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "image": "./assets/images/pandahealth-doctor-logo.png",
+          "imageWidth": 250,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
+            "image": "./assets/images/pandahealth-doctor-logo.png",
             "backgroundColor": "#000000"
           }
         }

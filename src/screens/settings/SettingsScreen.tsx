@@ -15,9 +15,12 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { GestureDetector } from 'react-native-gesture-handler';
+import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 
 export default function SettingsScreen() {
   const { user, logout } = useAuthStore();
+  const swipeGesture = useSwipeNavigation();
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   
@@ -94,7 +97,8 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <GestureDetector gesture={swipeGesture}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Profile Header */}
       <View style={styles.profileHeader}>
         <View style={styles.avatarContainer}>
@@ -246,6 +250,7 @@ export default function SettingsScreen() {
         <Text style={styles.appInfoText}>© 2026 PandaHealth</Text>
       </View>
     </ScrollView>
+    </GestureDetector>
   );
 }
 

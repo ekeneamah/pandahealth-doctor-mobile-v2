@@ -17,7 +17,11 @@ import {
     Text,
     TouchableOpacity,
     View,
+    LinearGradient,
 } from 'react-native';
+import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
+import { GestureDetector } from 'react-native-gesture-handler';
+import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 
 interface StatCardProps {
   title: string;
@@ -28,18 +32,20 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color, description }) => (
-  <View style={[styles.statCard, { borderLeftColor: color }]}>
-    <View style={[styles.statIconContainer, { backgroundColor: color + '15' }]}>
-      <Ionicons name={icon} size={20} color={color} />
+  <View style={styles.statCard}>
+    <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
+      <Ionicons name={icon} size={24} color={color} />
     </View>
     <Text style={styles.statValue}>{value}</Text>
     <Text style={styles.statTitle}>{title}</Text>
     {description && <Text style={styles.statDescription}>{description}</Text>}
+    <View style={[styles.statIndicator, { backgroundColor: color }]} />
   </View>
 );
 
 export default function DashboardScreen() {
   const { user } = useAuthStore();
+  const swipeGesture = useSwipeNavigation();
   const [stats, setStats] = useState<DoctorDashboardStats | null>(null);
   const [slaMetrics, setSlaMetrics] = useState<SLAMetrics | null>(null);
   const [recentCases, setRecentCases] = useState<Case[]>([]);
@@ -98,30 +104,41 @@ export default function DashboardScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
+    <GestureDetector gesture={swipeGesture}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
       {/* Welcome Header */}
-      <View style={styles.welcomeCard}>
-        <Text style={styles.welcomeText}>
-          Good {getTimeOfDay()}, Dr. {user?.firstName}!
-        </Text>
-        <Text style={styles.welcomeSubtext}>
-          You have {stats?.pendingCases || 0} cases waiting for review
-        </Text>
-        <TouchableOpacity
-          style={styles.viewCasesButton}
-          onPress={() => router.push('/(tabs)/cases')}
-        >
-          <Text style={styles.viewCasesText}>View Pending Cases</Text>
-          <Ionicons name="arrow-forward" size={16} color={colors.primary[600]} />
-        </TouchableOpacity>
-      </View>
+      <ExpoLinearGradient
+        colors={[colors.primary[600], colors.primary[700]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.welcomeCard}
+      >
+        <View style={styles.welcomeContent}>
+          <Text style={styles.welcomeText}>
+            Good {getTimeOfDay()}, Dr. {user?.firstName}! 👋
+          </Text>
+          <Text style={styles.welcomeSubtext}>
+            You have {stats?.pendingCases || 0} cases waiting for review
+          </Text>
+          <TouchableOpacity
+            style={styles.viewCasesButton}
+            onPress={() => router.push('/(tabs)/cases')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.viewCasesText}>View Pending Cases</Text>
+            <Ionicons name="arrow-forward" size={18} color={colors.white} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.decorativeCircle1} />
+        <View style={styles.decorativeCircle2} />
+      </ExpoLinearGradient>
 
       {/* Stats Grid */}
       <View style={styles.statsGrid}>
@@ -236,6 +253,7 @@ export default function DashboardScreen() {
         );
       })}
     </ScrollView>
+    </GestureDetector>
   );
 }
 
@@ -252,71 +270,107 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.gray[50],
   },
   welcomeCard: {
-    backgroundColor: colors.primary[600],
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius['2xl'],
     padding: spacing.xl,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
+    overflow: 'hidden',
+    ...shadows.lg,
+  },
+  welcomeContent: {
+    zIndex: 1,
   },
   welcomeText: {
-    fontSize: fontSize.xl,
+    fontSize: fontSize['2xl'],
     fontWeight: '700',
     color: colors.white,
+    marginBottom: spacing.sm,
   },
   welcomeSubtext: {
-    fontSize: fontSize.sm,
-    color: colors.primary[100],
-    marginTop: spacing.xs,
+    fontSize: fontSize.base,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: spacing.lg,
   },
   viewCasesButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.lg,
-    marginTop: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.full,
     alignSelf: 'flex-start',
     gap: spacing.sm,
   },
   viewCasesText: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.base,
     fontWeight: '600',
-    color: colors.primary[600],
+    color: colors.white,
+  },
+  decorativeCircle1: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    top: -30,
+    right: -30,
+  },
+  decorativeCircle2: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    bottom: 20,
+    right: 40,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   statCard: {
     flex: 1,
     minWidth: '45%',
     backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    borderLeftWidth: 3,
-    ...shadows.sm,
+    borderRadius: borderRadius['2xl'],
+    padding: spacing.xl,
+    ...shadows.md,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  statIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 4,
   },
   statIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.md,
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.xl,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   statValue: {
-    fontSize: fontSize['2xl'],
-    fontWeight: '700',
+    fontSize: fontSize['3xl'],
+    fontWeight: '800',
     color: colors.gray[900],
+    marginBottom: spacing.xs,
   },
   statTitle: {
     fontSize: fontSize.sm,
-    color: colors.gray[600],
-    marginTop: spacing.xs,
+    color: colors.gray[500],
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   statDescription: {
     fontSize: fontSize.xs,
@@ -324,47 +378,52 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   slaCard: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
+    ...shadows.sm,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   sectionTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: '600',
+    fontSize: fontSize.xl,
+    fontWeight: '700',
     color: colors.gray[900],
   },
   slaGrid: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
+    gap: spacing.md,
+    marginTop: spacing.lg,
   },
   slaItem: {
     flex: 1,
     backgroundColor: colors.gray[50],
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
     alignItems: 'center',
   },
   slaValue: {
-    fontSize: fontSize.lg,
-    fontWeight: '700',
+    fontSize: fontSize['2xl'],
+    fontWeight: '800',
     color: colors.gray[900],
   },
   slaLabel: {
     fontSize: fontSize.xs,
     color: colors.gray[500],
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
   caseCard: {
     backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
     marginBottom: spacing.md,
-    ...shadows.sm,
+    ...shadows.md,
+    borderWidth: 1,
+    borderColor: colors.gray[100],
   },
   caseHeader: {
     flexDirection: 'row',
@@ -379,16 +438,18 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.gray[400],
     marginBottom: spacing.xs,
+    fontWeight: '600',
   },
   patientName: {
-    fontSize: fontSize.base,
-    fontWeight: '600',
+    fontSize: fontSize.lg,
+    fontWeight: '700',
     color: colors.gray[900],
   },
   caseSymptoms: {
     fontSize: fontSize.sm,
     color: colors.gray[600],
     marginBottom: spacing.md,
+    lineHeight: 20,
   },
   caseFooter: {
     flexDirection: 'row',

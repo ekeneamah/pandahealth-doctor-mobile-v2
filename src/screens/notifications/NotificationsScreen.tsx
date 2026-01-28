@@ -11,6 +11,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { GestureDetector } from 'react-native-gesture-handler';
+import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import fcmService from '../../services/fcm.service';
 import notificationService, { Notification } from '../../services/notification.service';
 
@@ -21,6 +23,7 @@ interface GroupedNotification {
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const swipeGesture = useSwipeNavigation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [groupedNotifications, setGroupedNotifications] = useState<GroupedNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +50,7 @@ export default function NotificationsScreen() {
 
       // Get unread count
       const countData = await notificationService.getUnreadCount();
-      setUnreadCount(countData.total);
+      setUnreadCount(countData.totalUnread || 0);
     } catch (error: any) {
       console.error('Error loading notifications:', error);
       Alert.alert('Error', error.response?.data?.message || 'Failed to load notifications');
@@ -224,36 +227,37 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        {unreadCount > 0 && (
-          <TouchableOpacity onPress={handleMarkAllAsRead} style={styles.markAllButton}>
-            <Text style={styles.markAllText}>Mark all read</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+    <GestureDetector gesture={swipeGesture}>
+      <View style={styles.container}>
+        {/* Header Actions */}
+        <View style={styles.headerActions}>
+          {unreadCount > 0 && (
+            <TouchableOpacity onPress={handleMarkAllAsRead} style={styles.markAllButton}>
+              <Ionicons name="checkmark-done-outline" size={20} color="#0088CC" />
+              <Text style={styles.markAllText}>Mark all read</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-      {/* Filter */}
-      <View style={styles.filterContainer}>
-        <TouchableOpacity
-          style={[styles.filterButton, filter === 'all' && styles.activeFilterButton]}
-          onPress={() => setFilter('all')}
-        >
-          <Text style={[styles.filterText, filter === 'all' && styles.activeFilterText]}>
-            All
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterButton, filter === 'unread' && styles.activeFilterButton]}
-          onPress={() => setFilter('unread')}
-        >
-          <Text style={[styles.filterText, filter === 'unread' && styles.activeFilterText]}>
-            Unread {unreadCount > 0 && `(${unreadCount})`}
-          </Text>
-        </TouchableOpacity>
-      </View>
+        {/* Filter */}
+        <View style={styles.filterContainer}>
+          <TouchableOpacity
+            style={[styles.filterButton, filter === 'all' && styles.activeFilterButton]}
+            onPress={() => setFilter('all')}
+          >
+            <Text style={[styles.filterText, filter === 'all' && styles.activeFilterText]}>
+              All
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterButton, filter === 'unread' && styles.activeFilterButton]}
+            onPress={() => setFilter('unread')}
+          >
+            <Text style={[styles.filterText, filter === 'unread' && styles.activeFilterText]}>
+              Unread {unreadCount > 0 && `(${unreadCount})`}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
       {/* Notifications List */}
       {notifications.length === 0 ? (
@@ -274,7 +278,8 @@ export default function NotificationsScreen() {
           contentContainerStyle={styles.listContent}
         />
       )}
-    </View>
+      </View>
+    </GestureDetector>
   );
 }
 
@@ -320,22 +325,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  header: {
+  headerActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 12,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
   },
   markAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
@@ -350,6 +351,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: '#fff',
     gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   filterButton: {
     paddingHorizontal: 16,

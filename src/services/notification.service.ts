@@ -16,14 +16,10 @@ export interface Notification {
 }
 
 export interface UnreadCount {
-  total: number;
-  byType: {
-    chatMessage: number;
-    newCase: number;
-    caseAssigned: number;
-    adminMessage: number;
-    systemAlert: number;
-  };
+  totalUnread: number;
+  chatMessages: number;
+  newCases: number;
+  adminMessages: number;
 }
 
 export interface NotificationResponse {
