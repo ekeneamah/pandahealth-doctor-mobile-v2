@@ -7,8 +7,8 @@ import 'react-native-reanimated';
 import { enableFreeze } from 'react-native-screens';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useAuthStore } from '@/src/store/auth.store';
 import fcmService from '@/src/services/fcm.service';
+import { useAuthStore } from '@/src/store/auth.store';
 
 // Disable screen freezing to fix IndexOutOfBoundsException
 enableFreeze(false);

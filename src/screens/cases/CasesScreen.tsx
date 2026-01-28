@@ -3,7 +3,7 @@ import { borderRadius, colors, fontSize, shadows, spacing } from '@/src/constant
 import { getErrorMessage } from '@/src/lib/api-client';
 import { getPriorityColor, getSLAColor, getWaitTime } from '@/src/lib/utils';
 import { caseService } from '@/src/services/case.service';
-import type { Case, CasePriority } from '@/src/types';
+import type { Case } from '@/src/types';
 import { getSLAStatus } from '@/src/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';

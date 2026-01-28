@@ -1,9 +1,9 @@
 import { colors } from '@/src/constants/theme';
+import notificationService from '@/src/services/notification.service';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import notificationService from '@/src/services/notification.service';
+import { StyleSheet, Text, View } from 'react-native';
 
 export default function TabLayout() {
   const [unreadCount, setUnreadCount] = useState(0);
