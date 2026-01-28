@@ -7,6 +7,7 @@ import { useAuthStore } from '@/src/store/auth.store';
 import type { Case, DoctorDashboardStats, SLAMetrics } from '@/src/types';
 import { getSLAStatus } from '@/src/types';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -16,10 +17,8 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
-    LinearGradient,
+    View
 } from 'react-native';
-import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 

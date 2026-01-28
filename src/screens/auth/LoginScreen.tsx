@@ -11,6 +11,7 @@ import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
     Alert,
+    Image,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -18,7 +19,6 @@ import {
     Text,
     TouchableOpacity,
     View,
-    Image,
 } from 'react-native';
 import { z } from 'zod';
 
