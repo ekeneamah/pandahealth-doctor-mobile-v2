@@ -1,0 +1,87 @@
+{
+  "project_info": {
+    "project_number": "451713665228",
+    "firebase_url": "https://healthpanda-8110d-default-rtdb.firebaseio.com",
+    "project_id": "healthpanda-8110d",
+    "storage_bucket": "healthpanda-8110d.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:451713665228:android:1d7d5e7e2fe33bcb77da69",
+        "android_client_info": {
+          "package_name": "com.pandahealth.doctor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQ5dGBQrWzVVW7x-eNhGVZYzZuka_gW1k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:451713665228:android:328976ce43c011b777da69",
+        "android_client_info": {
+          "package_name": "com.yalzapp.healthpandadoctor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQ5dGBQrWzVVW7x-eNhGVZYzZuka_gW1k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:451713665228:android:ed972796cbcc9dff77da69",
+        "android_client_info": {
+          "package_name": "com.yalzapp.healthpandahospital"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQ5dGBQrWzVVW7x-eNhGVZYzZuka_gW1k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:451713665228:android:3d95b73e22237e0277da69",
+        "android_client_info": {
+          "package_name": "com.yalzapp.pandahealthhospital"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQ5dGBQrWzVVW7x-eNhGVZYzZuka_gW1k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

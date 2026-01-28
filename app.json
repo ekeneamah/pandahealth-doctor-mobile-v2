@@ -40,7 +40,9 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -54,6 +56,9 @@
         "development": {
           "apiBaseUrl": "https://pandahealthapi-linux-cbb2faancjdre6ae.westeurope-01.azurewebsites.net/api"
         }
+      },
+      "eas": {
+        "projectId": "64b98fb4-b016-4f73-8575-7ccb41e30c57"
       }
     }
   }

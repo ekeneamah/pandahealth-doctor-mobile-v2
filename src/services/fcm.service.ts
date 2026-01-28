@@ -2,6 +2,7 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import messaging from '@react-native-firebase/messaging';
 import notificationService from './notification.service';
 
 // Configure notification behavior
@@ -76,24 +77,24 @@ class FcmService {
   }
 
   /**
-   * Get device push token
+   * Get native FCM device token (for Firebase Cloud Messaging)
    */
   private async getDeviceToken(): Promise<string | null> {
     try {
-      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-      
-      if (!projectId) {
-        console.error('FCM: No project ID found in app config');
+      // Request permission for iOS
+      const authStatus = await messaging().requestPermission();
+      const enabled =
+        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+      if (!enabled) {
+        console.log('FCM: Permission not granted');
         return null;
       }
 
-      const token = (
-        await Notifications.getExpoPushTokenAsync({
-          projectId,
-        })
-      ).data;
-
-      console.log('FCM: Device token obtained:', token);
+      // Get FCM token
+      const token = await messaging().getToken();
+      console.log('FCM: Native device token obtained:', token);
       return token;
     } catch (error) {
       console.error('FCM: Error getting device token:', error);
