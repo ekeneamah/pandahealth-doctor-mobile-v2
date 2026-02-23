@@ -94,6 +94,14 @@ function RootLayoutNav() {
           headerBackTitle: 'Back',
         }}
       />
+      <Stack.Screen
+        name="pmv/[id]"
+        options={{
+          headerShown: true,
+          title: 'PMV Details',
+          headerBackTitle: 'Back',
+        }}
+      />
     </Stack>
   );
 }

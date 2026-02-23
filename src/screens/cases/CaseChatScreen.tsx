@@ -1,11 +1,14 @@
 import { colors } from '@/src/constants/theme';
 import type { ChatMessage as APIChatMessage } from '@/src/types';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -18,12 +21,16 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import caseService, { Case } from '../../services/case.service';
 import chatService from '../../services/chat.service';
+import storageService from '../../services/storage.service';
 
 interface ChatMessage {
   id: string;
   sender: 'doctor' | 'pmv';
   message: string;
   timestamp: Date;
+  messageType?: 'Text' | 'Image' | 'Document';
+  attachmentUrl?: string;
+  attachmentName?: string;
 }
 
 export default function CaseChatScreen() {
@@ -37,6 +44,13 @@ export default function CaseChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [selectedAttachment, setSelectedAttachment] = useState<{
+    type: 'Image' | 'Document';
+    uri: string;
+    name?: string;
+  } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
 
   useEffect(() => {
     loadCaseData();
@@ -68,16 +82,31 @@ export default function CaseChatScreen() {
         duration: `${duration}ms`
       });
       
-      // Warn if case not claimed
-      if (!data.doctorId) {
-        console.warn('[CaseChatScreen] WARNING: Case has no doctorId assigned!', {
+      // Auto-claim case if not claimed yet
+      if (!data.doctorId && data.status === 'Pending') {
+        console.log('[CaseChatScreen] Auto-claiming unclaimed case:', {
           caseId: id,
-          status: data.status,
           caseNumber: data.caseNumber
         });
+        
+        const claimResponse = await caseService.claimCase(id);
+        if (claimResponse.success && claimResponse.data) {
+          console.log('[CaseChatScreen] Case auto-claimed successfully:', {
+            caseId: id,
+            doctorId: claimResponse.data.doctorId
+          });
+          setCaseData(claimResponse.data);
+        } else {
+          console.warn('[CaseChatScreen] Failed to auto-claim case:', {
+            caseId: id,
+            message: claimResponse.message
+          });
+          // Still set the original case data to allow viewing
+          setCaseData(data);
+        }
+      } else {
+        setCaseData(data);
       }
-      
-      setCaseData(data);
     } catch (error: any) {
       console.error('[CaseChatScreen] Error loading case:', {
         caseId: id,
@@ -110,6 +139,9 @@ export default function CaseChatScreen() {
         sender: msg.senderId === currentCase.doctorId ? 'doctor' : 'pmv',
         message: msg.message,
         timestamp: new Date(msg.createdAt),
+        messageType: msg.messageType,
+        attachmentUrl: msg.attachmentUrl,
+        attachmentName: msg.attachmentName,
       }));
       
       console.log('[CaseChatScreen] Messages loaded:', {
@@ -137,10 +169,104 @@ export default function CaseChatScreen() {
       // Just log the error for now
     }
   };
+  const handlePickImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Permission to access photos is required!');
+        return;
+      }
 
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+        base64: false,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedAttachment({
+          type: 'Image',
+          uri: result.assets[0].uri,
+          name: result.assets[0].fileName || 'image.jpg',
+        });
+      }
+    } catch (error) {
+      console.error('[CaseChatScreen] Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedAttachment({
+          type: 'Document',
+          uri: result.assets[0].uri,
+          name: result.assets[0].name,
+        });
+      }
+    } catch (error) {
+      console.error('[CaseChatScreen] Error picking document:', error);
+      Alert.alert('Error', 'Failed to pick document');
+    }
+  };
+
+  const handleRemoveAttachment = () => {
+    setSelectedAttachment(null);
+  };
+  const handleClaimCase = async () => {
+    console.log('[CaseChatScreen] Claiming case:', { caseId: id });
+    setIsClaiming(true);
+    
+    try {
+      const startTime = Date.now();
+      const response = await caseService.claimCase(id);
+      const duration = Date.now() - startTime;
+      
+      if (response.success && response.data) {
+        console.log('[CaseChatScreen] Case claimed successfully:', {
+          caseId: id,
+          caseNumber: response.data.caseNumber,
+          doctorId: response.data.doctorId,
+          duration: `${duration}ms`
+        });
+        
+        // Update the case data
+        setCaseData(response.data);
+        
+        Alert.alert(
+          'Success', 
+          'Case claimed successfully. You can now chat with the PMV.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        console.error('[CaseChatScreen] Failed to claim case:', {
+          caseId: id,
+          message: response.message
+        });
+        Alert.alert('Error', response.message || 'Failed to claim case');
+      }
+    } catch (error: any) {
+      console.error('[CaseChatScreen] Error claiming case:', {
+        caseId: id,
+        error: error.message,
+        response: error.response?.data
+      });
+      Alert.alert('Error', 'Failed to claim case. Please try again.');
+    } finally {
+      setIsClaiming(false);
+    }
+  };
   const handleSend = async () => {
-    if (!newMessage.trim()) {
-      console.log('[CaseChatScreen] Send blocked: empty message');
+    if (!newMessage.trim() && !selectedAttachment) {
+      console.log('[CaseChatScreen] Send blocked: empty message and no attachment');
       return;
     }
 
@@ -152,36 +278,77 @@ export default function CaseChatScreen() {
         caseStatus: caseData?.status
       });
       Alert.alert(
-        'Cannot Send Message',
-        'This case has not been claimed yet. Please claim the case first before starting a chat.',
+        'Case Not Claimed',
+        'To chat with the PMV, you need to claim this case first. Would you like to claim it now?',
         [
-          { text: 'OK' },
-          { text: 'Claim Case', onPress: () => router.back() }
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Claim Case', 
+            onPress: handleClaimCase
+          }
         ]
       );
       return;
     }
 
-    const messageText = newMessage.trim();
-    const messageLength = messageText.length;
+    const messageText = newMessage.trim() || (selectedAttachment ? `Sent a ${selectedAttachment.type.toLowerCase()}` : '');
     
     console.log('[CaseChatScreen] Sending message:', {
       caseId: id,
-      messageLength,
-      messagePreview: messageText.slice(0, 50) + (messageLength > 50 ? '...' : ''),
+      messageText,
+      hasAttachment: !!selectedAttachment,
+      attachmentType: selectedAttachment?.type,
       hasDoctorId: !!caseData.doctorId,
       caseStatus: caseData.status
     });
 
     setSending(true);
+    setUploadProgress(0);
     const startTime = Date.now();
     
     try {
-      // Send message via API
+      let attachmentUrl: string | undefined;
+      let attachmentName: string | undefined;
+
+      // Upload attachment to Firebase Storage if present
+      if (selectedAttachment) {
+        console.log('[CaseChatScreen] Uploading attachment to Firebase Storage');
+        
+        if (selectedAttachment.type === 'Image') {
+          const uploadResult = await storageService.uploadImage(
+            selectedAttachment.uri,
+            id,
+            (progress) => {
+              setUploadProgress(progress.progress);
+              console.log('[CaseChatScreen] Upload progress:', progress.progress + '%');
+            }
+          );
+          attachmentUrl = uploadResult.url;
+          attachmentName = uploadResult.name;
+          console.log('[CaseChatScreen] Image uploaded:', { url: attachmentUrl, name: attachmentName });
+        } else if (selectedAttachment.type === 'Document') {
+          const uploadResult = await storageService.uploadDocument(
+            selectedAttachment.uri,
+            id,
+            selectedAttachment.name || 'document',
+            (progress) => {
+              setUploadProgress(progress.progress);
+              console.log('[CaseChatScreen] Upload progress:', progress.progress + '%');
+            }
+          );
+          attachmentUrl = uploadResult.url;
+          attachmentName = uploadResult.name;
+          console.log('[CaseChatScreen] Document uploaded:', { url: attachmentUrl, name: attachmentName });
+        }
+      }
+
+      // Send message with Firebase Storage URL
       const apiMessage = await chatService.sendMessage({
         caseId: id,
         message: messageText,
-        messageType: 'Text',
+        messageType: selectedAttachment?.type || 'Text',
+        attachmentUrl,
+        attachmentName,
       });
       
       // Convert API response to local format
@@ -190,18 +357,23 @@ export default function CaseChatScreen() {
         sender: 'doctor',
         message: apiMessage.message,
         timestamp: new Date(apiMessage.createdAt),
+        messageType: apiMessage.messageType,
+        attachmentUrl: apiMessage.attachmentUrl,
+        attachmentName: apiMessage.attachmentName,
       };
 
       setMessages((prev) => [...prev, message]);
       setNewMessage('');
+      setSelectedAttachment(null);
+      setUploadProgress(0);
       
       const duration = Date.now() - startTime;
       console.log('[CaseChatScreen] Message sent successfully:', {
         caseId: id,
         messageId: message.id,
+        hasAttachment: !!attachmentUrl,
         duration: `${duration}ms`,
         totalMessages: messages.length + 1,
-        isLocalOnly: false
       });
 
       // Scroll to bottom
@@ -211,6 +383,13 @@ export default function CaseChatScreen() {
     } catch (error: any) {
       const duration = Date.now() - startTime;
       console.error('[CaseChatScreen] Error sending message:', {
+        caseId: id,
+        error: error.message,
+        duration: `${duration}ms`,
+        response: error.response?.data
+      });
+      Alert.alert('Error', 'Failed to send message. Please try again.');
+    } finally {
         caseId: id,
         error: error.message,
         duration: `${duration}ms`,
@@ -255,8 +434,13 @@ export default function CaseChatScreen() {
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>Case #{caseData.caseNumber || id?.slice(0, 8)}</Text>
             <Text style={styles.headerSubtitle}>
-              Chat with {caseData.patientName || 'PMV'}
+              {caseData.pmvBusinessName || caseData.pmvName || 'PMV'}
             </Text>
+            {caseData.pmvBusinessName && caseData.pmvName && (
+              <Text style={styles.headerPmvName}>
+                {caseData.pmvName}
+              </Text>
+            )}
           </View>
           <View style={[styles.statusBadge, getStatusStyle(caseData.status)]}>
             <Text style={styles.statusText}>{caseData.status}</Text>
@@ -303,14 +487,37 @@ export default function CaseChatScreen() {
                     })}
                   </Text>
                 </View>
-                <Text
-                  style={[
-                    styles.messageText,
-                    msg.sender === 'doctor' ? styles.doctorText : styles.pmvText,
-                  ]}
-                >
-                  {msg.message}
-                </Text>
+                
+                {/* Image Attachment */}
+                {msg.messageType === 'Image' && msg.attachmentUrl && (
+                  <Image
+                    source={{ uri: msg.attachmentUrl }}
+                    style={styles.messageImage}
+                    resizeMode="cover"
+                  />
+                )}
+
+                {/* Document Attachment */}
+                {msg.messageType === 'Document' && msg.attachmentName && (
+                  <View style={styles.documentAttachment}>
+                    <Ionicons name="document-text" size={24} color={colors.primary[600]} />
+                    <Text style={styles.documentName} numberOfLines={1}>
+                      {msg.attachmentName}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Message Text */}
+                {msg.message && (
+                  <Text
+                    style={[
+                      styles.messageText,
+                      msg.sender === 'doctor' ? styles.doctorText : styles.pmvText,
+                    ]}
+                  >
+                    {msg.message}
+                  </Text>
+                )}
               </View>
             ))
           )}
@@ -318,7 +525,63 @@ export default function CaseChatScreen() {
 
         {/* Input */}
         <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          {/* Selected Attachment Preview */}
+          {selectedAttachment && (
+            <View style={styles.attachmentPreview}>
+              <View style={styles.attachmentPreviewContent}>
+                {selectedAttachment.type === 'Image' ? (
+                  <Image
+                    source={{ uri: selectedAttachment.uri }}
+                    style={styles.attachmentPreviewImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.attachmentPreviewDoc}>
+                    <Ionicons name="document-text" size={32} color={colors.primary[600]} />
+                    <Text style={styles.attachmentPreviewName} numberOfLines={1}>
+                      {selectedAttachment.name}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <TouchableOpacity
+                onPress={handleRemoveAttachment}
+                style={styles.attachmentRemoveButton}
+              >
+                <Ionicons name="close-circle" size={24} color={colors.error[600]} />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Upload Progress */}
+          {sending && uploadProgress > 0 && uploadProgress < 100 && (
+            <View style={styles.uploadProgressContainer}>
+              <View style={styles.uploadProgressBar}>
+                <View style={[styles.uploadProgressFill, { width: `${uploadProgress}%` }]} />
+              </View>
+              <Text style={styles.uploadProgressText}>{uploadProgress}% uploaded</Text>
+            </View>
+          )}
+
           <View style={styles.inputWrapper}>
+            {/* Attachment Buttons */}
+            <View style={styles.attachmentButtons}>
+              <TouchableOpacity
+                onPress={handlePickImage}
+                style={styles.attachmentButton}
+                disabled={sending}
+              >
+                <Ionicons name="image-outline" size={24} color={colors.primary[600]} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handlePickDocument}
+                style={styles.attachmentButton}
+                disabled={sending}
+              >
+                <Ionicons name="document-attach-outline" size={24} color={colors.primary[600]} />
+              </TouchableOpacity>
+            </View>
+
             <TextInput
               style={styles.input}
               placeholder="Type a message..."
@@ -329,9 +592,12 @@ export default function CaseChatScreen() {
               maxLength={500}
             />
             <TouchableOpacity
-              style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
+              style={[
+                styles.sendButton,
+                (!newMessage.trim() && !selectedAttachment) && styles.sendButtonDisabled
+              ]}
               onPress={handleSend}
-              disabled={!newMessage.trim() || sending}
+              disabled={(!newMessage.trim() && !selectedAttachment) || sending}
             >
               {sending ? (
                 <ActivityIndicator size="small" color={colors.white} />
@@ -339,7 +605,7 @@ export default function CaseChatScreen() {
                 <Ionicons
                   name="send"
                   size={20}
-                  color={newMessage.trim() ? colors.white : colors.gray[400]}
+                  color={(newMessage.trim() || selectedAttachment) ? colors.white : colors.gray[400]}
                 />
               )}
             </TouchableOpacity>
@@ -414,6 +680,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.primary[100],
     marginTop: 4,
+  },
+  headerPmvName: {
+    fontSize: 12,
+    color: colors.primary[200],
+    marginTop: 2,
+    fontStyle: 'italic',
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -539,5 +811,83 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: colors.gray[300],
+  },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  documentAttachment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.gray[100],
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  documentName: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: colors.gray[900],
+    flex: 1,
+  },
+  attachmentButtons: {
+    flexDirection: 'row',
+    marginRight: 8,
+    gap: 4,
+  },
+  attachmentButton: {
+    padding: 8,
+  },
+  attachmentPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.gray[50],
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  attachmentPreviewContent: {
+    flex: 1,
+  },
+  attachmentPreviewImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  attachmentPreviewDoc: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  attachmentPreviewName: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: colors.gray[900],
+    flex: 1,
+  },
+  attachmentRemoveButton: {
+    marginLeft: 8,
+  },
+  uploadProgressContainer: {
+    marginBottom: 8,
+    paddingHorizontal: 8,
+  },
+  uploadProgressBar: {
+    height: 4,
+    backgroundColor: colors.gray[200],
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  uploadProgressFill: {
+    height: '100%',
+    backgroundColor: colors.primary[600],
+    borderRadius: 2,
+  },
+  uploadProgressText: {
+    fontSize: 12,
+    color: colors.gray[600],
+    marginTop: 4,
+    textAlign: 'center',
   },
 });

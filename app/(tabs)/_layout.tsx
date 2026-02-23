@@ -77,7 +77,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      initialRouteName="index"
+      initialRouteName="cases"
       screenOptions={{
         freezeOnBlur: false,
         tabBarActiveTintColor: colors.primary[600],

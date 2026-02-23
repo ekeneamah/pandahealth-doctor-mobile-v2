@@ -38,6 +38,12 @@ export interface LoginResponse {
   user: User;
 }
 
+export interface UpdateProfileRequest {
+  email: string;
+  phoneNumber: string;
+  specialization?: string;
+}
+
 // ==========================================
 // API Response Types
 // ==========================================

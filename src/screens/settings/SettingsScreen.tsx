@@ -19,14 +19,13 @@ import { GestureDetector } from 'react-native-gesture-handler';
 import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 
 export default function SettingsScreen() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, setUser } = useAuthStore();
   const swipeGesture = useSwipeNavigation();
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   
   // Profile form state
-  const [firstName, setFirstName] = useState(user?.firstName || '');
-  const [lastName, setLastName] = useState(user?.lastName || '');
+  const [email, setEmail] = useState(user?.email || '');
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
   const [specialization, setSpecialization] = useState(user?.specialization || '');
   
@@ -36,13 +35,32 @@ export default function SettingsScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const handleUpdateProfile = async () => {
+    // Validate email format
+    if (!email.includes('@')) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
+    // Validate phone number (basic check)
+    if (!phoneNumber || phoneNumber.length < 10) {
+      Alert.alert('Error', 'Please enter a valid phone number');
+      return;
+    }
+
     setIsUpdatingProfile(true);
     try {
-      // API call here
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const updatedUser = await authService.updateProfile({
+        email,
+        phoneNumber,
+        specialization: specialization || undefined,
+      });
+      
+      // Update the user in the auth store
+      setUser(updatedUser);
+      
       Alert.alert('Success', 'Profile updated successfully');
     } catch (error) {
-      Alert.alert('Error', 'Failed to update profile');
+      Alert.alert('Error', getErrorMessage(error));
     } finally {
       setIsUpdatingProfile(false);
     }
@@ -124,29 +142,28 @@ export default function SettingsScreen() {
           <View style={styles.formRow}>
             <View style={styles.formHalf}>
               <Text style={styles.label}>First Name</Text>
-              <TextInput
-                style={styles.input}
-                value={firstName}
-                onChangeText={setFirstName}
-                placeholder="First name"
-              />
+              <View style={[styles.input, styles.inputDisabled]}>
+                <Text style={styles.disabledText}>{user?.firstName}</Text>
+              </View>
             </View>
             <View style={styles.formHalf}>
               <Text style={styles.label}>Last Name</Text>
-              <TextInput
-                style={styles.input}
-                value={lastName}
-                onChangeText={setLastName}
-                placeholder="Last name"
-              />
+              <View style={[styles.input, styles.inputDisabled]}>
+                <Text style={styles.disabledText}>{user?.lastName}</Text>
+              </View>
             </View>
           </View>
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Email</Text>
-            <View style={[styles.input, styles.inputDisabled]}>
-              <Text style={styles.disabledText}>{user?.email}</Text>
-            </View>
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Enter email address"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
           </View>
 
           <View style={styles.formGroup}>

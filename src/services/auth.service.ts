@@ -1,5 +1,5 @@
 import apiClient from '@/src/lib/api-client';
-import type { ApiResponse, LoginRequest, LoginResponse, User } from '@/src/types';
+import type { ApiResponse, LoginRequest, LoginResponse, User, UpdateProfileRequest } from '@/src/types';
 
 const logAuth = (action: string, data: any) => {
   const timestamp = new Date().toISOString();
@@ -112,6 +112,30 @@ export const authService = {
       logAuth('CHANGE_PASSWORD_SUCCESS', {});
     } catch (error) {
       logAuth('CHANGE_PASSWORD_ERROR', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  },
+
+  async updateProfile(request: UpdateProfileRequest): Promise<User> {
+    try {
+      logAuth('UPDATE_PROFILE_START', {
+        email: request.email,
+        phoneNumber: request.phoneNumber,
+        specialization: request.specialization,
+      });
+
+      const response = await apiClient.put<ApiResponse<User>>('/auth/profile', request);
+      
+      logAuth('UPDATE_PROFILE_SUCCESS', {
+        userId: response.data.data?.id,
+        email: response.data.data?.email,
+      });
+
+      return response.data.data!;
+    } catch (error) {
+      logAuth('UPDATE_PROFILE_ERROR', {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;

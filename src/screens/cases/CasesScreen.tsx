@@ -44,11 +44,31 @@ export default function CasesScreen() {
       const priority = selectedPriority === 'All' ? undefined : selectedPriority;
       
       // Call different API based on active tab
-      const response = activeTab === 'Pending'
-        ? await caseService.getPendingCases(pageNum, 20, priority)
-        : activeTab === 'My Cases'
-        ? await caseService.getMyCases(pageNum, 20, 'InReview')
-        : await caseService.getCompletedCases(pageNum, 20);
+      let response;
+      if (activeTab === 'Pending') {
+        response = await caseService.getPendingCases(pageNum, 20, priority);
+      } else if (activeTab === 'My Cases') {
+        // Get all assigned cases without status filter
+        response = await caseService.getMyCases(pageNum, 20);
+        
+        // Filter to show only active cases (InReview and Diagnosed)
+        // Exclude completed/cancelled/referred cases which appear in History
+        if (response.success && response.data) {
+          const activeCases = response.data.data.filter(c => 
+            c.status === 'InReview' || c.status === 'Diagnosed'
+          );
+          response = {
+            ...response,
+            data: {
+              ...response.data,
+              data: activeCases,
+              total: activeCases.length,
+            }
+          };
+        }
+      } else {
+        response = await caseService.getCompletedCases(pageNum, 20);
+      }
       
       console.log('[CasesScreen] Response:', {
         success: response.success,
