@@ -9,6 +9,7 @@ import { enableFreeze } from 'react-native-screens';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import fcmService from '@/src/services/fcm.service';
+import tokenRefreshService from '@/src/services/token-refresh.service';
 import { useAuthStore } from '@/src/store/auth.store';
 
 // Disable screen freezing to fix IndexOutOfBoundsException
@@ -45,15 +46,17 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const { isHydrated, isAuthenticated } = useAuthStore();
 
-  // Initialize FCM when user is authenticated
+  // Initialize FCM and token refresh when user is authenticated
   useEffect(() => {
     if (isAuthenticated) {
       fcmService.initialize();
+      tokenRefreshService.initialize(useAuthStore);
     }
     
     // Cleanup on unmount
     return () => {
       fcmService.cleanup();
+      tokenRefreshService.cleanup();
     };
   }, [isAuthenticated]);
 

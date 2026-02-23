@@ -10,6 +10,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     Alert,
+    KeyboardAvoidingView,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -48,6 +50,8 @@ export default function CaseDetailScreen() {
   const [advice, setAdvice] = useState('');
   const [medications, setMedications] = useState<Partial<Medication>[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const loadCaseDetails = useCallback(async () => {
     try {
@@ -118,13 +122,14 @@ export default function CaseDetailScreen() {
       const response = await caseService.submitDiagnosis(id!, {
         caseId: id!,
         diagnosis: diagnosis.trim(),
-        advice: advice.trim(),
-        medications: medications.map(m => ({
-          ...m,
-          ...classifyDrug(m.name!)
-        })) as Medication[],
-        followUpRequired: false,
-        referralRequired: false,
+        doctorAdvice: advice.trim(),
+        prescriptions: medications.map(m => ({
+          drugName: m.name!,
+          dosage: m.dosage!,
+          frequency: m.frequency!,
+          durationDays: parseInt(m.duration!.match(/\d+/)?.[0] || '7'),
+          instructions: undefined,
+        })),
       });
 
       if (response.success) {
@@ -140,6 +145,38 @@ export default function CaseDetailScreen() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleClaimCase = async () => {
+    Alert.alert(
+      'Claim Case',
+      'Are you sure you want to claim this case?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Claim',
+          onPress: async () => {
+            setIsClaiming(true);
+            try {
+              console.log('[CaseDetailScreen] Claiming case:', id);
+              const response = await caseService.claimCase(id!);
+
+              if (response.success && response.data) {
+                setCaseData(response.data);
+                Alert.alert('Success', 'Case claimed successfully. You can now review and diagnose this case.');
+              } else {
+                Alert.alert('Error', response.message || 'Failed to claim case');
+              }
+            } catch (error) {
+              console.error('[CaseDetailScreen] Error claiming case:', error);
+              Alert.alert('Error', getErrorMessage(error));
+            } finally {
+              setIsClaiming(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (isLoading) {
@@ -158,21 +195,77 @@ export default function CaseDetailScreen() {
     );
   }
 
+  const isPendingCase = caseData.status === 'Pending';
   const priorityColors = getPriorityColor(caseData.priority);
   const slaStatus = getSLAStatus(caseData.createdAt);
   const slaColors = getSLAColor(slaStatus);
 
+  // Check if diagnosis can still be edited (within 30 minutes)
+  const canEditDiagnosis = () => {
+    if (!caseData.diagnosis || !caseData.diagnosisSubmittedAt) return false;
+    const submittedAt = new Date(caseData.diagnosisSubmittedAt);
+    const now = new Date();
+    const minutesSince = (now.getTime() - submittedAt.getTime()) / (1000 * 60);
+    return minutesSince <= 30;
+  };
+
+  const getEditWindowRemaining = () => {
+    if (!caseData.diagnosisSubmittedAt) return 0;
+    const submittedAt = new Date(caseData.diagnosisSubmittedAt);
+    const now = new Date();
+    const minutesSince = (now.getTime() - submittedAt.getTime()) / (1000 * 60);
+    return Math.max(0, Math.ceil(30 - minutesSince));
+  };
+
+  const handleEditDiagnosis = () => {
+    setIsEditMode(true);
+    setDiagnosis(caseData?.diagnosis || '');
+    setAdvice(caseData?.doctorAdvice || '');
+    // Map existing prescriptions back to medication format
+    if (caseData?.prescriptions) {
+      setMedications(caseData.prescriptions.map(p => ({
+        name: p.drugName,
+        dosage: p.dosage,
+        frequency: p.frequency,
+        duration: `${p.durationDays} days`,
+      })));
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setDiagnosis('');
+    setAdvice('');
+    setMedications([]);
+  };
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <ScrollView 
+        style={styles.container} 
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.scrollContent}
+      >
       {/* Header Card */}
       <View style={styles.headerCard}>
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.caseNumber}>{caseData.caseNumber}</Text>
-            <Text style={styles.patientName}>{caseData.patientName}</Text>
-            <Text style={styles.patientDetails}>
-              {caseData.patientAge}y • {caseData.patientGender}
+            <Text style={styles.patientName}>
+              {caseData.patientName || `Patient (${caseData.patientGender}, ${caseData.patientAgeRange || caseData.patientAge})`}
             </Text>
+            <Text style={styles.patientDetails}>
+              {caseData.patientAgeRange || `${caseData.patientAge}y`} • {caseData.patientGender}
+              {caseData.patientPhone && ` • ${caseData.patientPhone}`}
+            </Text>
+            {caseData.type && (
+              <Text style={styles.caseType}>Type: {caseData.type}</Text>
+            )}
           </View>
           <View style={styles.headerBadges}>
             <Badge backgroundColor={priorityColors.bg} textColor={priorityColors.text}>
@@ -184,15 +277,39 @@ export default function CaseDetailScreen() {
           </View>
         </View>
         <View style={styles.headerMeta}>
-          <View style={styles.metaItem}>
+          <TouchableOpacity 
+            style={styles.metaItem}
+            onPress={() => caseData.pmvId && router.push({ pathname: '/pmv/[id]', params: { id: caseData.pmvId } })}
+            activeOpacity={0.7}
+          >
             <Ionicons name="storefront-outline" size={16} color={colors.primary[100]} />
-            <Text style={styles.metaText}>{caseData.pmvBusinessName || caseData.pmvName}</Text>
-          </View>
+            <View style={{ flex: 1, alignItems: 'flex-start' }}>
+              <Text style={[styles.metaText, styles.metaTextClickable]} numberOfLines={1}>
+                {caseData.pmvBusinessName || 'Unknown Business'}
+              </Text>
+              {caseData.pmvName && caseData.pmvBusinessName && (
+                <Text style={[styles.metaText, styles.pmvOwnerName]} numberOfLines={1}>
+                  {caseData.pmvName}
+                </Text>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={14} color={colors.primary[100]} />
+          </TouchableOpacity>
           <View style={styles.metaItem}>
             <Ionicons name="time-outline" size={16} color={colors.primary[100]} />
             <Text style={styles.metaText}>{formatDateTime(caseData.createdAt)}</Text>
           </View>
         </View>
+        
+        {/* Chat Button - Always visible */}
+        <TouchableOpacity 
+          style={styles.chatButton}
+          onPress={() => router.push(`/case/${id}/chat`)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.primary[600]} />
+          <Text style={styles.chatButtonText}>Chat with PMV</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Symptoms */}
@@ -201,12 +318,21 @@ export default function CaseDetailScreen() {
           <CardTitle>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="medical-outline" size={18} color={colors.primary[600]} />
-              <Text style={styles.sectionTitle}>Symptoms</Text>
+              <Text style={styles.sectionTitle}>Chief Complaint & Symptoms</Text>
             </View>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Text style={styles.symptomsText}>{caseData.symptoms}</Text>
+          {caseData.chiefComplaint && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Chief Complaint:</Text>
+              <Text style={styles.detailText}>{caseData.chiefComplaint}</Text>
+            </View>
+          )}
+          <View style={styles.detailItem}>
+            <Text style={styles.detailLabel}>Symptoms:</Text>
+            <Text style={styles.symptomsText}>{caseData.symptoms}</Text>
+          </View>
           {caseData.symptomsDetails && caseData.symptomsDetails.length > 0 && (
             <View style={styles.symptomsList}>
               {caseData.symptomsDetails.map((detail, index) => (
@@ -217,8 +343,54 @@ export default function CaseDetailScreen() {
               ))}
             </View>
           )}
+          {caseData.notes && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Additional Notes:</Text>
+              <Text style={styles.detailText}>{caseData.notes}</Text>
+            </View>
+          )}
         </CardContent>
       </Card>
+
+      {/* Medical History */}
+      {(caseData.pastMedicalHistory || caseData.drugHistory || caseData.allergies || caseData.systemicReview) && (
+        <Card style={styles.section}>
+          <CardHeader>
+            <CardTitle>
+              <View style={styles.sectionTitleRow}>
+                <Ionicons name="clipboard-outline" size={18} color={colors.primary[600]} />
+                <Text style={styles.sectionTitle}>Medical History</Text>
+              </View>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {caseData.pastMedicalHistory && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Past Medical History:</Text>
+                <Text style={styles.detailText}>{caseData.pastMedicalHistory}</Text>
+              </View>
+            )}
+            {caseData.drugHistory && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Drug History:</Text>
+                <Text style={styles.detailText}>{caseData.drugHistory}</Text>
+              </View>
+            )}
+            {caseData.allergies && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Allergies:</Text>
+                <Text style={styles.detailText}>{caseData.allergies}</Text>
+              </View>
+            )}
+            {caseData.systemicReview && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Systemic Review:</Text>
+                <Text style={styles.detailText}>{caseData.systemicReview}</Text>
+              </View>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Vitals */}
       {caseData.vitals && (
@@ -246,7 +418,7 @@ export default function CaseDetailScreen() {
       )}
 
       {/* PMV Notes */}
-      {caseData.pmvNotes && (
+      {caseData.pmvNotes && !isPendingCase && (
         <Card style={styles.section}>
           <CardHeader>
             <CardTitle>
@@ -262,116 +434,222 @@ export default function CaseDetailScreen() {
         </Card>
       )}
 
+      {/* Submitted Diagnosis Display */}
+      {caseData.diagnosis && !isEditMode && (
+        <Card style={styles.section}>
+          <CardHeader>
+            <CardTitle>
+              <View style={styles.sectionTitleRow}>
+                <Ionicons name="medical" size={18} color={colors.primary[600]} />
+                <Text style={styles.sectionTitle}>Diagnosis</Text>
+              </View>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {canEditDiagnosis() && (
+              <View style={styles.editWarning}>
+                <Ionicons name="time-outline" size={16} color={colors.warning[600]} />
+                <Text style={styles.editWarningText}>
+                  Can edit for {getEditWindowRemaining()} more minutes
+                </Text>
+                <TouchableOpacity style={styles.editButton} onPress={handleEditDiagnosis}>
+                  <Ionicons name="create-outline" size={16} color={colors.primary[600]} />
+                  <Text style={styles.editButtonText}>Edit</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Diagnosis:</Text>
+              <Text style={styles.detailText}>{caseData.diagnosis}</Text>
+            </View>
+            {caseData.doctorAdvice && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Doctor's Advice:</Text>
+                <Text style={styles.detailText}>{caseData.doctorAdvice}</Text>
+              </View>
+            )}
+            {caseData.prescriptions && caseData.prescriptions.length > 0 && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Prescribed Medications:</Text>
+                {caseData.prescriptions.map((med, index) => (
+                  <View key={index} style={styles.prescriptionItem}>
+                    <Text style={styles.prescriptionName}>• {med.drugName}</Text>
+                    <Text style={styles.prescriptionDetails}>
+                      {med.dosage} - {med.frequency} for {med.durationDays} days
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Diagnosis Form */}
-      <Card style={styles.section}>
-        <CardHeader>
-          <CardTitle>
-            <View style={styles.sectionTitleRow}>
-              <Ionicons name="create-outline" size={18} color={colors.primary[600]} />
-              <Text style={styles.sectionTitle}>Your Diagnosis</Text>
-            </View>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Diagnosis *</Text>
-            <TextInput
-              style={styles.textArea}
-              placeholder="Enter your diagnosis..."
-              value={diagnosis}
-              onChangeText={setDiagnosis}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Advice / Instructions *</Text>
-            <TextInput
-              style={styles.textArea}
-              placeholder="Enter advice for the patient..."
-              value={advice}
-              onChangeText={setAdvice}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-          </View>
-
-          {/* Medications */}
-          <View style={styles.formGroup}>
-            <View style={styles.medicationsHeader}>
-              <Text style={styles.label}>Medications</Text>
-              <TouchableOpacity style={styles.addButton} onPress={addMedication}>
-                <Ionicons name="add" size={20} color={colors.primary[600]} />
-                <Text style={styles.addButtonText}>Add</Text>
-              </TouchableOpacity>
+      {!isPendingCase && (isEditMode || !caseData.diagnosis) && (
+        <Card style={styles.section}>
+          <CardHeader>
+            <CardTitle>
+              <View style={styles.sectionTitleRow}>
+                <Ionicons name="create-outline" size={18} color={colors.primary[600]} />
+                <Text style={styles.sectionTitle}>{isEditMode ? 'Edit Diagnosis' : 'Your Diagnosis'}</Text>
+              </View>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Diagnosis *</Text>
+              <TextInput
+                style={styles.textArea}
+                placeholder="Enter your diagnosis..."
+                value={diagnosis}
+                onChangeText={setDiagnosis}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
             </View>
 
-            {medications.map((med, index) => {
-              const classification = med.name ? classifyDrug(med.name) : null;
-              return (
-                <View key={index} style={styles.medicationCard}>
-                  <View style={styles.medicationHeader}>
-                    <Text style={styles.medicationIndex}>Drug {index + 1}</Text>
-                    <TouchableOpacity onPress={() => removeMedication(index)}>
-                      <Ionicons name="trash-outline" size={18} color={colors.error[500]} />
-                    </TouchableOpacity>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Advice / Instructions *</Text>
+              <TextInput
+                style={styles.textArea}
+                placeholder="Enter advice for the patient..."
+                value={advice}
+                onChangeText={setAdvice}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+            </View>
+
+            {/* Medications */}
+            <View style={styles.formGroup}>
+              <View style={styles.medicationsHeader}>
+                <Text style={styles.label}>Medications</Text>
+                <TouchableOpacity style={styles.addButton} onPress={addMedication}>
+                  <Ionicons name="add" size={20} color={colors.primary[600]} />
+                  <Text style={styles.addButtonText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+
+              {medications.map((med, index) => {
+                const classification = med.name ? classifyDrug(med.name) : null;
+                return (
+                  <View key={index} style={styles.medicationCard}>
+                    <View style={styles.medicationHeader}>
+                      <Text style={styles.medicationIndex}>Drug {index + 1}</Text>
+                      <TouchableOpacity onPress={() => removeMedication(index)}>
+                        <Ionicons name="trash-outline" size={18} color={colors.error[500]} />
+                      </TouchableOpacity>
+                    </View>
+                    
+                    {/* Drug Name */}
+                    <View style={styles.fieldContainer}>
+                      <Text style={styles.fieldLabel}>Drug Name *</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="e.g., Paracetamol, Amoxicillin"
+                        value={med.name}
+                        onChangeText={(v) => updateMedication(index, 'name', v)}
+                      />
+                    </View>
+                    {classification && (
+                      <Badge
+                        variant={
+                          classification.type === 'Controlled' ? 'error' : 
+                          classification.isOTC ? 'success' : 'warning'
+                        }
+                        style={styles.drugBadge}
+                      >
+                        {classification.type === 'PrescriptionOnly' 
+                          ? '💊 Prescription Required' 
+                          : classification.type === 'Controlled'
+                          ? '⚠️ Controlled Drug'
+                          : '✓ Over-the-Counter'}
+                      </Badge>
+                    )}
+                    
+                    {/* Dosage and Frequency */}
+                    <View style={styles.medicationRow}>
+                      <View style={[styles.fieldContainer, styles.halfInput]}>
+                        <Text style={styles.fieldLabel}>Dosage *</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="e.g., 500mg, 2 tablets"
+                          value={med.dosage}
+                          onChangeText={(v) => updateMedication(index, 'dosage', v)}
+                          keyboardType="visible-password"
+                        />
+                      </View>
+                      <View style={[styles.fieldContainer, styles.halfInput]}>
+                        <Text style={styles.fieldLabel}>Frequency *</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="e.g., 3 times daily"
+                          value={med.frequency}
+                          onChangeText={(v) => updateMedication(index, 'frequency', v)}
+                          keyboardType="default"
+                        />
+                      </View>
+                    </View>
+                    
+                    {/* Duration */}
+                    <View style={styles.fieldContainer}>
+                      <Text style={styles.fieldLabel}>Duration *</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="e.g., 7 days, 2 weeks"
+                        value={med.duration}
+                        onChangeText={(v) => updateMedication(index, 'duration', v)}
+                        keyboardType="default"
+                      />
+                    </View>
                   </View>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Drug name"
-                    value={med.name}
-                    onChangeText={(v) => updateMedication(index, 'name', v)}
-                  />
-                  {classification && (
-                    <Badge
-                      variant={classification.isOTC ? 'success' : 'warning'}
-                      style={styles.drugBadge}
-                    >
-                      {classification.type}
-                    </Badge>
-                  )}
-                  <View style={styles.medicationRow}>
-                    <TextInput
-                      style={[styles.input, styles.halfInput]}
-                      placeholder="Dosage"
-                      value={med.dosage}
-                      onChangeText={(v) => updateMedication(index, 'dosage', v)}
-                    />
-                    <TextInput
-                      style={[styles.input, styles.halfInput]}
-                      placeholder="Frequency"
-                      value={med.frequency}
-                      onChangeText={(v) => updateMedication(index, 'frequency', v)}
-                    />
-                  </View>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Duration (e.g., 7 days)"
-                    value={med.duration}
-                    onChangeText={(v) => updateMedication(index, 'duration', v)}
-                  />
-                </View>
-              );
-            })}
-          </View>
-        </CardContent>
-      </Card>
+                );
+              })}
+            </View>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Submit Button */}
-      <View style={styles.submitContainer}>
-        <Button
-          title="Submit Diagnosis"
-          onPress={handleSubmit}
-          isLoading={isSubmitting}
-          fullWidth
-          size="lg"
-          leftIcon={<Ionicons name="send-outline" size={20} color={colors.white} />}
-        />
-      </View>
-    </ScrollView>
+      {!isPendingCase && (isEditMode || !caseData.diagnosis) && (
+        <View style={styles.submitContainer}>
+          {isEditMode && (
+            <Button
+              title="Cancel"
+              onPress={handleCancelEdit}
+              variant="outline"
+              fullWidth
+              size="lg"
+              style={styles.cancelButton}
+            />
+          )}
+          <Button
+            title={isEditMode ? 'Update Diagnosis' : 'Submit Diagnosis'}
+            onPress={handleSubmit}
+            isLoading={isSubmitting}
+            fullWidth
+            size="lg"
+            leftIcon={<Ionicons name="send-outline" size={20} color={colors.white} />}
+          />
+        </View>
+      )}
+      </ScrollView>
+
+      {/* Claim Case FAB - Only for pending cases */}
+      {isPendingCase && (
+        <TouchableOpacity 
+          style={styles.fab}
+          onPress={handleClaimCase}
+          disabled={isClaiming}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="hand-right" size={28} color={colors.white} />
+        </TouchableOpacity>
+      )}
+    </KeyboardAvoidingView>
   );
 }
 
@@ -379,6 +657,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.gray[50],
+  },
+  scrollContent: {
+    paddingBottom: spacing.xl * 2,
   },
   loadingContainer: {
     flex: 1,
@@ -408,8 +689,11 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.primary[100],
     marginTop: spacing.xs,
-  },
-  headerBadges: {
+  },  caseType: {
+    fontSize: fontSize.sm,
+    color: colors.primary[200],
+    marginTop: spacing.xs / 2,
+  },  headerBadges: {
     alignItems: 'flex-end',
     gap: spacing.xs,
   },
@@ -430,6 +714,52 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.primary[100],
   },
+  metaTextClickable: {
+    textDecorationLine: 'underline',
+  },
+  pmvOwnerName: {
+    fontSize: 11,
+    color: colors.primary[200],
+    marginTop: 2,
+  },
+  chatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    shadowColor: colors.gray[900],
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  chatButtonText: {
+    fontSize: fontSize.base,
+    fontWeight: '600',
+    color: colors.primary[600],
+  },
+  fab: {
+    position: 'absolute',
+    right: spacing.xl,
+    bottom: spacing.xl * 4,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.success[600],
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.gray[900],
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 16,
+    zIndex: 999,
+  },
   section: {
     margin: spacing.lg,
     marginBottom: 0,
@@ -448,6 +778,20 @@ const styles = StyleSheet.create({
     fontSize: fontSize.base,
     color: colors.gray[700],
     lineHeight: 24,
+  },
+  detailItem: {
+    marginBottom: spacing.md,
+  },
+  detailLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.gray[600],
+    marginBottom: spacing.xs,
+  },
+  detailText: {
+    fontSize: fontSize.base,
+    color: colors.gray[800],
+    lineHeight: 22,
   },
   symptomsList: {
     marginTop: spacing.md,
@@ -521,6 +865,15 @@ const styles = StyleSheet.create({
     color: colors.gray[700],
     marginBottom: spacing.sm,
   },
+  fieldContainer: {
+    marginBottom: spacing.md,
+  },
+  fieldLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.gray[700],
+    marginBottom: spacing.xs,
+  },
   textArea: {
     backgroundColor: colors.gray[50],
     borderWidth: 1,
@@ -539,10 +892,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     fontSize: fontSize.base,
     color: colors.gray[900],
-    marginBottom: spacing.sm,
   },
   halfInput: {
     flex: 1,
+    marginRight: spacing.sm,
   },
   medicationsHeader: {
     flexDirection: 'row',
@@ -587,5 +940,54 @@ const styles = StyleSheet.create({
   submitContainer: {
     padding: spacing.lg,
     paddingBottom: spacing['4xl'],
+  },
+  prescriptionItem: {
+    marginTop: spacing.sm,
+    paddingLeft: spacing.md,
+  },
+  prescriptionName: {
+    fontSize: fontSize.base,
+    fontWeight: '600',
+    color: colors.gray[900],
+    marginBottom: spacing.xs / 2,
+  },
+  prescriptionDetails: {
+    fontSize: fontSize.sm,
+    color: colors.gray[600],
+    lineHeight: 20,
+  },
+  editWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.warning[50],
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
+    gap: spacing.xs,
+  },
+  editWarningText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.warning[700],
+    fontWeight: '500',
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs / 2,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+  },
+  editButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.primary[600],
+  },
+  cancelButton: {
+    marginBottom: spacing.md,
   },
 });

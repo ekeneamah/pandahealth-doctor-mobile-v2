@@ -2,6 +2,8 @@ import type { User } from '@/src/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { setAuthStoreRef } from '@/src/lib/api-client';
+import tokenRefreshService from '@/src/services/token-refresh.service';
 
 interface AuthState {
   user: User | null;
@@ -47,6 +49,10 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
           isLoading: false,
         });
+        
+        // Store token timestamp for refresh tracking
+        tokenRefreshService.storeTokenTimestamp();
+        tokenRefreshService.updateLastActivity();
       },
 
       setUser: (user) => {
@@ -62,6 +68,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
+        console.log('[AuthStore] Logging out - clearing all auth data');
         set({
           user: null,
           token: null,
@@ -85,8 +92,12 @@ export const useAuthStore = create<AuthState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setHydrated(true);
+          console.log('[AuthStore] Rehydrated with isAuthenticated:', state.isAuthenticated);
         }
       },
     }
   )
 );
+
+// Set the auth store reference for the API client to use
+setAuthStoreRef(useAuthStore.getState());

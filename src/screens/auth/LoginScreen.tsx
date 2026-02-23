@@ -75,7 +75,8 @@ export default function LoginScreen() {
         return;
       }
 
-      const user = {
+      // Use user object from response if available, otherwise construct from response data
+      const user = response.user || {
         id: response.userId,
         email: response.email,
         firstName: response.fullName.split(' ')[0] || '',

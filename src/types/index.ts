@@ -35,6 +35,7 @@ export interface LoginResponse {
   refreshToken: string;
   expiresIn: number;
   sessionId: string;
+  user: User;
 }
 
 // ==========================================
@@ -82,7 +83,8 @@ export interface Case {
   pmvNotes?: string;
   diagnosis?: string;
   doctorAdvice?: string;
-  prescription?: Prescription;
+  prescriptions?: PrescriptionDto[];
+  diagnosisSubmittedAt?: string;
   responseTime?: number;
   slaStatus?: SLAStatus;
   createdAt: string;
@@ -95,6 +97,7 @@ export type CaseStatus =
   | 'Pending'
   | 'AwaitingDoctor'
   | 'InReview'
+  | 'Diagnosed'
   | 'Completed'
   | 'Cancelled';
 
@@ -144,13 +147,16 @@ export type DrugType = 'OTC' | 'PrescriptionOnly' | 'Controlled';
 export interface SubmitDiagnosisRequest {
   caseId: string;
   diagnosis: string;
-  advice: string;
-  medications: Medication[];
-  prescriptionInstructions?: string;
-  followUpRequired: boolean;
-  followUpDate?: string;
-  referralRequired: boolean;
-  referralNotes?: string;
+  doctorAdvice: string;
+  prescriptions: PrescriptionDto[];
+}
+
+export interface PrescriptionDto {
+  drugName: string;
+  dosage: string;
+  frequency: string;
+  durationDays: number;
+  instructions?: string;
 }
 
 // ==========================================

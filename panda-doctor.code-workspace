@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../source/repo/pandahealthV2/pandahealth-be"
+		},
+		{
+			"path": "../panda-mobile"
+		}
+	],
+	"settings": {
+		"powershell.cwd": "panda-doctor",
+		"java.compile.nullAnalysis.mode": "automatic"
+	}
+}

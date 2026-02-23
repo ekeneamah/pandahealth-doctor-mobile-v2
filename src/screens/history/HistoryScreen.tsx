@@ -31,24 +31,49 @@ export default function HistoryScreen() {
 
   const loadHistory = useCallback(async (pageNum: number = 1, append: boolean = false) => {
     try {
-      console.log('[HistoryScreen] Loading history, page:', pageNum);
+      console.log('[HistoryScreen] Loading history, page:', pageNum, 'append:', append);
       
       const response = await caseService.getCompletedCases(pageNum, 20);
       
+      console.log('[HistoryScreen] Response received:', {
+        success: response.success,
+        hasData: !!response.data,
+        total: response.data?.total,
+        page: response.data?.page,
+        pageSize: response.data?.pageSize,
+        totalPages: response.data?.totalPages,
+        casesCount: response.data?.data?.length,
+        message: response.message,
+      });
+      
       if (response.success && response.data) {
-        console.log('[HistoryScreen] History loaded:', response.data.data.length);
+        console.log('[HistoryScreen] Cases loaded:', {
+          count: response.data.data.length,
+          firstCaseNumber: response.data.data[0]?.caseNumber,
+          lastCaseNumber: response.data.data[response.data.data.length - 1]?.caseNumber,
+        });
         const newCases = response.data.data || [];
         setCases(append ? [...cases, ...newCases] : newCases);
         setHasMore(response.data.page < response.data.totalPages);
+        console.log('[HistoryScreen] State updated:', {
+          totalCasesInState: append ? cases.length + newCases.length : newCases.length,
+          hasMore: response.data.page < response.data.totalPages,
+        });
       } else {
+        console.error('[HistoryScreen] Response not successful:', response);
         Alert.alert('Error', response.message || 'Failed to load case history');
       }
     } catch (error) {
       console.error('[HistoryScreen] Failed to load history:', error);
+      console.error('[HistoryScreen] Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       Alert.alert('Error', getErrorMessage(error));
     } finally {
       setIsLoading(false);
       setRefreshing(false);
+      console.log('[HistoryScreen] Loading complete, isLoading:', false, 'refreshing:', false);
     }
   }, []);
 
@@ -81,6 +106,20 @@ export default function HistoryScreen() {
 
   const renderCaseItem = ({ item }: { item: Case }) => {
     const priorityColors = getPriorityColor(item.priority);
+    
+    // Determine status badge based on case status
+    const getStatusBadge = () => {
+      switch (item.status) {
+        case 'Completed':
+          return <Badge variant="success">Completed</Badge>;
+        case 'Diagnosed':
+          return <Badge variant="primary">Diagnosed</Badge>;
+        case 'Referred':
+          return <Badge variant="warning">Referred</Badge>;
+        default:
+          return <Badge variant="default">{item.status}</Badge>;
+      }
+    };
 
     return (
       <TouchableOpacity
@@ -93,7 +132,7 @@ export default function HistoryScreen() {
             <Text style={styles.caseNumber}>{item.caseNumber}</Text>
             <Text style={styles.patientName}>{item.patientName}</Text>
           </View>
-          <Badge variant="success">Completed</Badge>
+          {getStatusBadge()}
         </View>
 
         {item.diagnosis && (

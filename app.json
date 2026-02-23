@@ -4,7 +4,6 @@
     "slug": "panda-doctor",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/pandahealth-doctor-logo.png",
     "scheme": "pandadoctor",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -14,14 +13,12 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.pandahealth.doctor"
+      "package": "com.pandahealth.doctor",
+      "googleServicesFile": "./android/app/google-services.json"
     },
     "web": {
       "output": "static",
@@ -58,8 +55,9 @@
           "apiBaseUrl": "https://pandahealthapi-linux-cbb2faancjdre6ae.westeurope-01.azurewebsites.net/api"
         }
       },
+      "router": {},
       "eas": {
-        "projectId": "64b98fb4-b016-4f73-8575-7ccb41e30c57"
+        "projectId": "132b2e5c-3578-4f3c-8aff-392555cd8e7e"
       }
     }
   }

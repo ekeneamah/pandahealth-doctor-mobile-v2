@@ -2,7 +2,7 @@ import { useRouter, useSegments } from 'expo-router';
 import { Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 
-const TAB_ROUTES = ['index', 'dashboard', 'cases', 'history', 'settings'] as const;
+const TAB_ROUTES = ['index', 'dashboard', 'cases', 'settings'] as const;
 
 export function useSwipeNavigation() {
   const router = useRouter();

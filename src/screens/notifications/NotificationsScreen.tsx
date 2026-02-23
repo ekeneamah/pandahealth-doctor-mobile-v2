@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -53,6 +53,14 @@ export default function NotificationsScreen() {
       setUnreadCount(countData.totalUnread || 0);
     } catch (error: any) {
       console.error('Error loading notifications:', error);
+      
+      // Don't show error alert for 401 (unauthorized) - API client handles logout/redirect
+      if (error.response?.status === 401) {
+        console.log('401 error - user will be redirected to login');
+        return;
+      }
+      
+      // Show error alert for other errors
       Alert.alert('Error', error.response?.data?.message || 'Failed to load notifications');
     } finally {
       setLoading(false);
@@ -60,16 +68,24 @@ export default function NotificationsScreen() {
     }
   }, [filter]);
 
-  useEffect(() => {
-    loadNotifications();
+  // Load notifications when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[NotificationsScreen] Screen focused - loading notifications');
+      loadNotifications();
 
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(() => {
-      loadNotifications(false);
-    }, 30000);
+      // Poll for new notifications every 30 seconds only when screen is focused
+      const interval = setInterval(() => {
+        console.log('[NotificationsScreen] Polling for new notifications (screen is focused)');
+        loadNotifications(false);
+      }, 30000);
 
-    return () => clearInterval(interval);
-  }, [loadNotifications]);
+      return () => {
+        console.log('[NotificationsScreen] Screen unfocused - clearing polling interval');
+        clearInterval(interval);
+      };
+    }, [loadNotifications])
+  );
 
   // Update badge count when unread count changes
   useEffect(() => {

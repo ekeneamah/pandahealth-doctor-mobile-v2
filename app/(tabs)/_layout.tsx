@@ -2,34 +2,78 @@ import { colors } from '@/src/constants/theme';
 import notificationService from '@/src/services/notification.service';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { Image, StyleSheet, Text, View, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
   const [unreadCount, setUnreadCount] = useState(0);
   const insets = useSafeAreaInsets();
-
-  useEffect(() => {
-    // Load unread count
-    loadUnreadCount();
-
-    // Poll every 30 seconds
-    const interval = setInterval(() => {
-      loadUnreadCount();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const appState = useRef(AppState.currentState);
 
   const loadUnreadCount = async () => {
     try {
+      console.log('[TabLayout] Loading unread count...');
       const data = await notificationService.getUnreadCount();
       setUnreadCount(data.totalUnread || 0);
+      console.log('[TabLayout] Unread count:', data.totalUnread);
     } catch (error) {
-      console.error('Error loading unread count:', error);
+      console.error('[TabLayout] Error loading unread count:', error);
     }
   };
+
+  const startPolling = () => {
+    if (intervalRef.current) {
+      console.log('[TabLayout] Polling already active');
+      return;
+    }
+    console.log('[TabLayout] Starting unread count polling (60s interval)');
+    // Poll every 60 seconds (reduced from 30 to minimize requests)
+    intervalRef.current = setInterval(() => {
+      loadUnreadCount();
+    }, 60000);
+  };
+
+  const stopPolling = () => {
+    if (intervalRef.current) {
+      console.log('[TabLayout] Stopping unread count polling');
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    // Load initial unread count
+    loadUnreadCount();
+    
+    // Start polling
+    startPolling();
+
+    // Listen to app state changes
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      console.log('[TabLayout] App state changed:', appState.current, '→', nextAppState);
+      
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        // App came to foreground - refresh count and resume polling
+        console.log('[TabLayout] App resumed - refreshing unread count');
+        loadUnreadCount();
+        startPolling();
+      } else if (nextAppState.match(/inactive|background/)) {
+        // App went to background - stop polling
+        console.log('[TabLayout] App backgrounded - stopping polling');
+        stopPolling();
+      }
+
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      stopPolling();
+      subscription.remove();
+    };
+  }, []);
+
 
   return (
     <Tabs
@@ -134,6 +178,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="history"
         options={{
+          href: null,
           title: 'History',
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 

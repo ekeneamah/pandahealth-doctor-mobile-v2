@@ -22,9 +22,12 @@ import { GestureDetector } from 'react-native-gesture-handler';
 import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 
 const PRIORITY_OPTIONS = ['All', 'Urgent', 'High', 'Medium', 'Low'];
+const CASE_TABS = ['Pending', 'My Cases', 'History'] as const;
+type CaseTab = typeof CASE_TABS[number];
 
 export default function CasesScreen() {
   const swipeGesture = useSwipeNavigation();
+  const [activeTab, setActiveTab] = useState<CaseTab>('Pending');
   const [cases, setCases] = useState<Case[]>([]);
   const [filteredCases, setFilteredCases] = useState<Case[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,10 +39,16 @@ export default function CasesScreen() {
 
   const loadCases = useCallback(async (pageNum: number = 1, append: boolean = false) => {
     try {
-      console.log('[CasesScreen] Loading cases, page:', pageNum);
+      console.log('[CasesScreen] Loading cases, page:', pageNum, 'tab:', activeTab);
       
       const priority = selectedPriority === 'All' ? undefined : selectedPriority;
-      const response = await caseService.getPendingCases(pageNum, 20, priority);
+      
+      // Call different API based on active tab
+      const response = activeTab === 'Pending'
+        ? await caseService.getPendingCases(pageNum, 20, priority)
+        : activeTab === 'My Cases'
+        ? await caseService.getMyCases(pageNum, 20, 'InReview')
+        : await caseService.getCompletedCases(pageNum, 20);
       
       console.log('[CasesScreen] Response:', {
         success: response.success,
@@ -63,11 +72,13 @@ export default function CasesScreen() {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, [selectedPriority]);
+  }, [activeTab, selectedPriority]);
 
   useEffect(() => {
+    setIsLoading(true);
+    setPage(1);
     loadCases(1, false);
-  }, [selectedPriority]);
+  }, [activeTab, selectedPriority]);
 
   useEffect(() => {
     let filtered = cases;
@@ -113,9 +124,8 @@ export default function CasesScreen() {
         <View style={styles.caseHeader}>
           <View style={styles.caseInfo}>
             <Text style={styles.caseNumber}>{item.caseNumber}</Text>
-            <Text style={styles.patientName}>{item.patientName}</Text>
             <Text style={styles.patientDetails}>
-              {item.patientAge}y • {item.patientGender}
+              {(item as any).patientAgeRange || (item.patientAge ? `${item.patientAge}y` : 'N/A')} • {item.patientGender || 'N/A'}
             </Text>
           </View>
           <View style={styles.badgeContainer}>
@@ -128,14 +138,29 @@ export default function CasesScreen() {
           </View>
         </View>
 
+        {(item as any).chiefComplaint && (
+          <Text style={styles.chiefComplaint} numberOfLines={2}>
+            {(item as any).chiefComplaint}
+          </Text>
+        )}
+        
         <Text style={styles.symptoms} numberOfLines={2}>
-          {item.symptoms}
+          💊 {item.symptoms}
         </Text>
 
         <View style={styles.caseFooter}>
           <View style={styles.pmvInfo}>
             <Ionicons name="storefront-outline" size={14} color={colors.gray[400]} />
-            <Text style={styles.pmvName}>{item.pmvName}</Text>
+            <View style={styles.pmvTextContainer}>
+              {item.pmvBusinessName && (
+                <Text style={styles.pmvBusinessName} numberOfLines={1}>
+                  {item.pmvBusinessName}
+                </Text>
+              )}
+              <Text style={styles.pmvName} numberOfLines={1}>
+                {item.pmvName}
+              </Text>
+            </View>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
         </View>
@@ -154,6 +179,27 @@ export default function CasesScreen() {
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={styles.container}>
+        {/* Tab Switcher */}
+        <View style={styles.tabContainer}>
+          {CASE_TABS.map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[
+                styles.tab,
+                activeTab === tab && styles.tabActive,
+              ]}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Text style={[
+                styles.tabText,
+                activeTab === tab && styles.tabTextActive,
+              ]}>
+                {tab}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {/* Search Bar */}
         <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
@@ -217,7 +263,13 @@ export default function CasesScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="clipboard-outline" size={48} color={colors.gray[300]} />
-            <Text style={styles.emptyText}>No pending cases</Text>
+            <Text style={styles.emptyText}>
+              {activeTab === 'Pending' 
+                ? 'No pending cases' 
+                : activeTab === 'My Cases'
+                ? 'No cases in review'
+                : 'No completed cases'}
+            </Text>
             <Text style={styles.emptySubtext}>
               Pull down to refresh
             </Text>
@@ -344,6 +396,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: spacing.sm,
   },
+  chiefComplaint: {
+    fontSize: fontSize.base,
+    color: colors.gray[900],
+    marginBottom: spacing.sm,
+    lineHeight: 22,
+    fontWeight: '600',
+  },
   symptoms: {
     fontSize: fontSize.sm,
     color: colors.gray[600],
@@ -362,11 +421,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    flex: 1,
+  },
+  pmvTextContainer: {
+    flex: 1,
+  },
+  pmvBusinessName: {
+    fontSize: fontSize.sm,
+    color: colors.gray[700],
+    fontWeight: '600',
   },
   pmvName: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     color: colors.gray[500],
-    fontWeight: '500',
+    fontWeight: '400',
+    marginTop: 2,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -382,5 +451,33 @@ const styles = StyleSheet.create({
     fontSize: fontSize.base,
     color: colors.gray[400],
     marginTop: spacing.sm,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.white,
+    padding: spacing.md,
+    gap: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[100],
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.xl,
+    alignItems: 'center',
+    backgroundColor: colors.gray[50],
+  },
+  tabActive: {
+    backgroundColor: colors.primary[600],
+    ...shadows.sm,
+  },
+  tabText: {
+    fontSize: fontSize.base,
+    fontWeight: '600',
+    color: colors.gray[600],
+  },
+  tabTextActive: {
+    color: colors.white,
   },
 });
