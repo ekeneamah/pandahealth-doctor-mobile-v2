@@ -87,6 +87,8 @@ export interface Case {
   symptomsDetails?: string[];
   vitals?: PatientVitals;
   pmvNotes?: string;
+  aiSummary?: string;
+  aiSummaryGeneratedAt?: string;
   diagnosis?: string;
   doctorAdvice?: string;
   prescriptions?: PrescriptionDto[];

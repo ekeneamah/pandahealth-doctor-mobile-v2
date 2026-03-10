@@ -352,6 +352,32 @@ export default function CaseDetailScreen() {
         </CardContent>
       </Card>
 
+      {/* AI Summary */}
+      {caseData.aiSummary && (
+        <Card style={[styles.section, styles.aiSummaryCard]}>
+          <CardHeader>
+            <CardTitle>
+              <View style={styles.sectionTitleRow}>
+                <Ionicons name="bulb-outline" size={18} color={colors.secondary[600]} />
+                <Text style={[styles.sectionTitle, styles.aiSummaryTitle]}>AI Clinical Summary</Text>
+                <View style={styles.aiBadge}>
+                  <Ionicons name="sparkles" size={12} color={colors.secondary[600]} />
+                  <Text style={styles.aiBadgeText}>AI</Text>
+                </View>
+              </View>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Text style={styles.aiSummaryText}>{caseData.aiSummary}</Text>
+            {caseData.aiSummaryGeneratedAt && (
+              <Text style={styles.aiSummaryTimestamp}>
+                Generated {formatDateTime(caseData.aiSummaryGeneratedAt)}
+              </Text>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Medical History */}
       {(caseData.pastMedicalHistory || caseData.drugHistory || caseData.allergies || caseData.systemicReview) && (
         <Card style={styles.section}>
@@ -989,5 +1015,40 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     marginBottom: spacing.md,
+  },
+  aiSummaryCard: {
+    backgroundColor: colors.secondary[50],
+    borderColor: colors.secondary[200],
+    borderWidth: 1,
+  },
+  aiSummaryTitle: {
+    color: colors.secondary[800],
+  },
+  aiBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.secondary[100],
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs / 2,
+    borderRadius: borderRadius.full,
+    marginLeft: spacing.sm,
+    gap: spacing.xs / 2,
+  },
+  aiBadgeText: {
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+    color: colors.secondary[700],
+    textTransform: 'uppercase',
+  },
+  aiSummaryText: {
+    fontSize: fontSize.base,
+    color: colors.gray[800],
+    lineHeight: 24,
+    marginBottom: spacing.sm,
+  },
+  aiSummaryTimestamp: {
+    fontSize: fontSize.xs,
+    color: colors.gray[500],
+    fontStyle: 'italic',
   },
 });
