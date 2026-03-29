@@ -390,13 +390,6 @@ export default function CaseChatScreen() {
       });
       Alert.alert('Error', 'Failed to send message. Please try again.');
     } finally {
-        caseId: id,
-        error: error.message,
-        duration: `${duration}ms`,
-        response: error.response?.data
-      });
-      Alert.alert('Error', 'Failed to send message. Please try again.');
-    } finally {
       setSending(false);
     }
   };
